@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1700" font-family="monospace" font-size="14">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1750 1700" font-family="monospace" font-size="14">
   <style>
     .wire   { stroke:#111; stroke-width:2; fill:none; }
     .dash   { stroke:#555; stroke-width:1.5; fill:none; stroke-dasharray:5,4; }
@@ -12,12 +12,13 @@
   </style>
 
   <!-- ======================= BACKGROUND ======================= -->
-  <rect x="0" y="0" width="1600" height="1700" fill="#f3ecda"/>
+  <rect x="0" y="0" width="1750" height="1700" fill="#f3ecda"/>
 
-  <text x="20" y="28" class="lbl-b" font-size="19">Rotary Phone &#8594; Pico (RP2040) &#8212; Rev F (AC-couples receiver via C5, D1 restricted to 1N4148, adds C6 hook filter, 2026-07-26)</text>
+  <text x="20" y="28" class="lbl-b" font-size="19">Rotary Phone &#8594; Pico (RP2040) &#8212; Rev G (replaces GP10 PWM/transistor receiver driver with a MAX98357A I2S DAC+amp module, 2026-07-26)</text>
   <text x="20" y="50" class="lbl-sm">Dial fully isolated from phone network. WHITE = shunt/off-normal (N1), BLUE = pulse (N2), GREEN/WHITE = switchhook lever (N3), RED/BLACK = carbon mic (N4), WHITE/GREEN = receiver (N5).</text>
   <text x="20" y="70" class="lbl-sm">Every dashed box below is a component that physically lives inside the phone (handset or dial); everything outside the dashed boxes is the discrete circuit you are building on/around the Pico.</text>
   <text x="20" y="90" class="lbl-sm">Phase 0 DMM result: mic resistance ~0.5&#8211;2k&#8486; baseline, drifting with ambient sound, spiking 5k&#8486;+ on shock &#8212; confirms carbon mic. Receiver (earpiece) ~50&#8211;300&#8486; electromagnetic coil.</text>
+  <text x="20" y="110" class="lbl-sm" fill="#1e5c1e">Rev G rationale: revF's bare-transistor PWM driver had no gain stage (Q1 only switches the rail through the coil) -- max output was a few mW, audibly "barely there" even at full duty swing. MAX98357A is a real Class-D amp with true gain, driven over I2S (hardware DMA, no MicroPython real-time bottleneck).</text>
 
   <!-- ======================= PICO BODY ======================= -->
   <rect x="850" y="170" width="260" height="680" rx="6" class="ic"/>
@@ -43,8 +44,18 @@
   <text x="1000" y="326" text-anchor="end" class="lbl-sm">GP14 phys19</text>
   <circle cx="1110" cy="460" r="3" class="node"/>
   <text x="1000" y="446" text-anchor="end" class="lbl-sm">GP15 phys20</text>
-  <circle cx="1110" cy="580" r="3" class="node"/>
-  <text x="1000" y="566" text-anchor="end" class="lbl-sm">GP10 phys14</text>
+
+  <!-- New Rev G I2S + power stubs, tucked into the clear gap above GP14
+       (y=230-311, well clear of both the 3V3(OUT) label at y=216 and the
+       GP14 row at y=340) so their labels don't collide with anything. -->
+  <circle cx="1110" cy="245" r="3" class="node"/>
+  <text x="1000" y="231" text-anchor="end" class="lbl-sm">GP16 phys21 I2S_BCLK</text>
+  <circle cx="1110" cy="267" r="3" class="node"/>
+  <text x="1000" y="253" text-anchor="end" class="lbl-sm">GP17 phys22 I2S_LRC</text>
+  <circle cx="1110" cy="289" r="3" class="node"/>
+  <text x="1000" y="275" text-anchor="end" class="lbl-sm">GP18 phys24 I2S_DIN</text>
+  <circle cx="1110" cy="311" r="3" class="node"/>
+  <text x="1000" y="297" text-anchor="end" class="lbl-sm">VBUS phys40 (5V, amp power)</text>
 
   <!-- Internal pull-ups on GP3 / GP4 (dashed, inside Pico) -->
   <line x1="910" y1="195" x2="990" y2="195" class="dash"/>
@@ -191,69 +202,74 @@
   <line x1="1290" y1="460" x2="1450" y2="460" class="wire"/>
   <line x1="1450" y1="460" x2="1450" y2="1080" class="wire"/>
 
-  <!-- ======================= RECEIVER / SPEAKER DRIVER (GP10 PWM) &#8212; N5 ======================= -->
-  <text x="1130" y="510" class="lbl-b">Receiver (earpiece) driver</text>
+  <!-- ======================= RECEIVER / SPEAKER DRIVER (MAX98357A over I2S) &#8212; N5 ======================= -->
+  <!-- Rev G: supersedes the revF GP10/R8/Q1/D1/C5 PWM/transistor driver, which
+       had no gain stage (Q1 only switched the coil across the 3.3-5V rail:
+       a few mW at best, confirmed "barely audible" on hardware even at full
+       PWM duty swing). Replaced with a MAX98357A breakout: a real Class-D
+       DAC+amp IC fed over I2S (hardware DMA on the RP2040: no more
+       MicroPython real-time sample-rate bottleneck either). If you still have
+       the old R8/Q1/D1/C5 stage wired, disconnect it: GP10 is now unused.
+       Module moved clear of the LED1/LED2 risers (x=1400/1450) into fresh
+       space starting at x=1460; the four new I2S/VBUS wires from the Pico's
+       top-gap stubs (y=245-311) run right above the LED section (which
+       starts at y=332) then turn down into the module's pin column. -->
+  <text x="1480" y="435" class="lbl-b">Receiver (earpiece) driver &#8212; MAX98357A I2S DAC+amp</text>
 
-  <line x1="1110" y1="580" x2="1160" y2="580" class="wire"/>
-  <line x1="1160" y1="580" x2="1220" y2="580" class="wire"/>
-  <rect x="1160" y="572" width="60" height="16" class="res"/>
-  <text x="1165" y="566" class="lbl-sm">R8 1k&#8486;</text>
-  <line x1="1220" y1="580" x2="1260" y2="580" class="wire"/>
-  <line x1="1260" y1="580" x2="1260" y2="800" class="wire"/>
-  <line x1="1260" y1="800" x2="1276" y2="800" class="wire"/>
-  <text x="1240" y="815" class="lbl-sm">B</text>
+  <line x1="1110" y1="245" x2="1460" y2="245" class="wire"/>
+  <line x1="1460" y1="245" x2="1460" y2="500" class="wire"/>
+  <line x1="1460" y1="500" x2="1480" y2="500" class="wire"/>
+  <line x1="1110" y1="267" x2="1465" y2="267" class="wire"/>
+  <line x1="1465" y1="267" x2="1465" y2="530" class="wire"/>
+  <line x1="1465" y1="530" x2="1480" y2="530" class="wire"/>
+  <line x1="1110" y1="289" x2="1470" y2="289" class="wire"/>
+  <line x1="1470" y1="289" x2="1470" y2="560" class="wire"/>
+  <line x1="1470" y1="560" x2="1480" y2="560" class="wire"/>
+  <line x1="1110" y1="311" x2="1475" y2="311" class="wire"/>
+  <line x1="1475" y1="311" x2="1475" y2="590" class="wire"/>
+  <line x1="1475" y1="590" x2="1480" y2="590" class="wire"/>
 
-  <circle cx="1310" cy="800" r="34" class="ic"/>
-  <text x="1350" y="796" class="lbl-b">Q1 NPN</text>
-  <text x="1350" y="812" class="lbl-sm">2N2222 / BC337 / BC547</text>
-  <text x="1350" y="828" class="lbl-sm">(any general-purpose NPN)</text>
+  <rect x="1480" y="470" width="220" height="230" class="ic"/>
+  <text x="1590" y="460" text-anchor="middle" class="lbl-b">MAX98357A</text>
+  <text x="1590" y="486" text-anchor="middle" class="lbl-sm">(e.g. Adafruit #3006 breakout)</text>
 
-  <line x1="1310" y1="766" x2="1310" y2="700" class="wire"/>
-  <text x="1320" y="740" class="lbl-sm">C</text>
-  <line x1="1310" y1="834" x2="1310" y2="1080" class="wire"/>
-  <text x="1320" y="850" class="lbl-sm">E</text>
+  <text x="1490" y="512" class="lbl-sm">BCLK</text>
+  <text x="1490" y="542" class="lbl-sm">LRC</text>
+  <text x="1490" y="572" class="lbl-sm">DIN</text>
+  <text x="1490" y="602" class="lbl-sm">VIN</text>
+
+  <!-- Module's own GND pin: local connection to the shared GND rail (not a Pico stub) -->
+  <line x1="1480" y1="620" x2="1460" y2="620" class="wire"/>
+  <line x1="1460" y1="620" x2="1460" y2="1080" class="wire"/>
+  <text x="1490" y="624" class="lbl-sm">GND</text>
+
+  <text x="1490" y="650" class="lbl-sm" fill="#555">SD_MODE: leave floating (breakout's</text>
+  <text x="1490" y="664" class="lbl-sm" fill="#555">onboard pull-up enables the amp)</text>
+  <text x="1490" y="680" class="lbl-sm" fill="#555">GAIN: leave floating for default 9dB</text>
+
+  <!-- Speaker/receiver output, bottom of module -->
+  <line x1="1520" y1="700" x2="1520" y2="740" class="wire"/>
+  <text x="1497" y="714" class="lbl-sm">OUT+</text>
+  <line x1="1620" y1="700" x2="1620" y2="722" class="wire"/>
+  <text x="1597" y="714" class="lbl-sm">OUT-</text>
 
   <!-- Receiver coil, enclosed like the dial/hook components since it lives inside the handset -->
-  <rect x="1260" y="612" width="100" height="103" fill="none" stroke="#7a4a9c" stroke-width="1.5" stroke-dasharray="7,5"/>
-  <text x="1150" y="605" class="lbl-sm" fill="#7a4a9c">inside handset &#8212; WHITE/GREEN pair (receiver, N5)</text>
-  <rect x="1280" y="630" width="60" height="70" class="res"/>
-  <text x="1285" y="655" class="lbl-sm">RECEIVER</text>
-  <text x="1285" y="668" class="lbl-sm">50&#8211;300&#8486;</text>
-  <text x="1285" y="681" class="lbl-sm">WHITE/GREEN</text>
-  <line x1="1310" y1="630" x2="1310" y2="585" class="wire"/>
-  <circle cx="1310" cy="585" r="3" class="node"/>
-  <!-- C5 DC-blocking cap (Rev F): in series above the coil/D1 node so the coil sees zero average DC -->
-  <line x1="1310" y1="585" x2="1310" y2="570" class="wire"/>
-  <line x1="1302" y1="570" x2="1318" y2="570" class="cap"/>
-  <line x1="1302" y1="560" x2="1318" y2="560" class="cap"/>
-  <line x1="1310" y1="560" x2="1310" y2="535" class="wire"/>
-  <text x="1284" y="552" class="lbl-b">+</text>
-  <text x="1330" y="568" class="lbl-sm">C5 100&#956;F elec. (DC block, + to rail)</text>
-  <text x="1290" y="528" class="lbl-sm">3V3 (or VBUS 5V for more volume)</text>
-  <line x1="1310" y1="700" x2="1310" y2="700" class="wire"/>
-  <circle cx="1310" cy="700" r="3" class="node"/>
-  <text x="1320" y="695" class="lbl-b">N5</text>
+  <rect x="1500" y="722" width="170" height="90" fill="none" stroke="#7a4a9c" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="1508" y="740" class="lbl-sm" fill="#7a4a9c">inside handset &#8212; WHITE/GREEN (N5)</text>
+  <rect x="1520" y="748" width="110" height="55" class="res"/>
+  <text x="1528" y="770" class="lbl-sm">RECEIVER 50&#8211;300&#8486;</text>
+  <text x="1528" y="784" class="lbl-sm">WHITE/GREEN</text>
+  <line x1="1620" y1="722" x2="1630" y2="748" class="wire"/>
+  <text x="1660" y="760" class="lbl-b">N5</text>
 
-  <!-- Flyback diode D1, parallel with receiver -->
-  <line x1="1310" y1="585" x2="1400" y2="585" class="wire"/>
-  <line x1="1400" y1="585" x2="1400" y2="630" class="wire"/>
-  <line x1="1390" y1="630" x2="1410" y2="630" class="wire"/>
-  <polygon points="1390,670 1410,670 1400,630" fill="#fff" stroke="#111" stroke-width="2"/>
-  <line x1="1400" y1="670" x2="1400" y2="700" class="wire"/>
-  <line x1="1400" y1="700" x2="1310" y2="700" class="wire"/>
-  <text x="1418" y="625" class="lbl-sm">D1 flyback</text>
-  <text x="1418" y="639" class="lbl-sm">1N4148 ONLY</text>
-  <text x="1418" y="653" class="lbl-sm">(1N400x t_rr too slow</text>
-  <text x="1418" y="667" class="lbl-sm">for 125kHz PWM)</text>
-
-  <text x="1160" y="900" class="lbl-sm">Silence = 50% PWM duty (~125kHz carrier);</text>
-  <text x="1160" y="916" class="lbl-sm">audio modulates duty; coil filters carrier.</text>
-  <text x="1160" y="936" class="lbl-sm">If receiver &lt;100&#8486;, add 47&#8211;100&#8486; in series</text>
-  <text x="1160" y="952" class="lbl-sm">between D1/collector node and coil.</text>
-  <text x="1160" y="972" class="lbl-sm">C5 blocks the ~11mA DC bias a bare 50%-duty</text>
-  <text x="1160" y="988" class="lbl-sm">drive would push through the coil &#8212; protects the</text>
-  <text x="1160" y="1004" class="lbl-sm">vintage receiver's diaphragm centering + magnet.</text>
-  <text x="1160" y="1020" class="lbl-sm">f_c = 1/(2&#960;&#183;150&#8486;&#183;100&#956;F) &#8776; 11Hz &#8212; passes full voice band.</text>
+  <text x="1160" y="830" class="lbl-sm">No PWM carrier, no flyback diode, no DC-block cap needed &#8212;</text>
+  <text x="1160" y="846" class="lbl-sm">the MAX98357A's bridged Class-D output is already AC (zero</text>
+  <text x="1160" y="862" class="lbl-sm">average DC across OUT+/OUT-), so it drives the coil directly.</text>
+  <text x="1160" y="882" class="lbl-sm">Verify the receiver's actual DCR with a DMM: if it's much</text>
+  <text x="1160" y="898" class="lbl-sm">higher than the ~4-8&#8486; speaker load this chip expects (a</text>
+  <text x="1160" y="914" class="lbl-sm">vintage coil often is), volume will still be current-limited &#8212;</text>
+  <text x="1160" y="930" class="lbl-sm">but the chip's real gain + 5V bridged swing should still beat</text>
+  <text x="1160" y="946" class="lbl-sm">the old bare-transistor driver by a wide margin.</text>
 
   <!-- ======================= MIC FRONT END (GP26 / ADC0) &#8212; N4 ======================= -->
   <!-- Everything below the GND rail belongs to this section; it never crosses the dial/hook wiring above. -->
@@ -359,10 +375,10 @@
   <text x="32" y="1512" class="lbl-sm" fill="#1c3f66">Debounce: 30ms (heavier lever spring than the dial contacts, which use 15ms). Polarity within the GREEN/WHITE pair does not matter.</text>
 
   <rect x="20" y="1545" width="1550" height="140" fill="#eaf3ea" stroke="#3a8a3a" stroke-width="1.5"/>
-  <text x="32" y="1565" class="lbl-b" fill="#1e5c1e">Mic + receiver front end &#8212; Phase 0 status &amp; next steps</text>
-  <text x="32" y="1583" class="lbl-sm" fill="#1e5c1e">Phase 0 COMPLETE: DMM confirms carbon mic (dynamic 0.5&#8211;2k&#8486;, spikes 5k&#8486;+) across RED/BLACK; receiver expected 50&#8211;300&#8486; across WHITE/GREEN &#8212; verify with DMM before wiring.</text>
-  <text x="32" y="1601" class="lbl-sm" fill="#1e5c1e">No amplifier IC anywhere: the carbon mic self-amplifies via its DC bias current (R4), and the high-impedance receiver coil is switched directly by one NPN transistor.</text>
+  <text x="32" y="1565" class="lbl-b" fill="#1e5c1e">Mic + receiver front end &#8212; status &amp; next steps (Rev G)</text>
+  <text x="32" y="1583" class="lbl-sm" fill="#1e5c1e">Mic front end (Phase 1) COMPLETE and hardware-verified: bias measured 1.648V, dead-center of the 1.65V target. No changes in Rev G.</text>
+  <text x="32" y="1601" class="lbl-sm" fill="#1e5c1e">Receiver driver (Phase 2) REVISED in Rev G: the bare-transistor PWM driver (GP10/R8/Q1/D1/C5) is superseded by a MAX98357A I2S DAC+amp module -- it has real gain, unlike a plain switch, and offloads audio timing to RP2040 DMA hardware instead of a MicroPython loop.</text>
   <text x="32" y="1619" class="lbl-sm" fill="#1e5c1e">Any film/polyester/polypropylene caps on hand are fine for C3 (coupling) and C4 (filter); use electrolytic for the bulk C1 (100&#956;F) bias decoupling &#8212; film at that value is unnecessarily large.</text>
-  <text x="32" y="1637" class="lbl-sm" fill="#1e5c1e">Next: Phase 1/2 wiring per this diagram, then Phase 3 firmware stages (PWM tone test &#8594; mic RMS meter &#8594; local sidetone loopback &#8594; USB streaming, last).</text>
-  <text x="32" y="1655" class="lbl-sm" fill="#1e5c1e">Component hunt list: R4 220&#8211;330&#8486;, R5 4.7k, R6/R7 2&#215;100k, R8 1k (optional 47&#8211;100&#8486; series w/ coil); C1 100&#956;F, C2 100nF, C3 1&#8211;10&#956;F, C4 10nF, C5 100&#956;F electrolytic, C6 100nF; one general NPN; one 1N4148 (NOT 1N400x &#8212; t_rr too slow for 125kHz).</text>
+  <text x="32" y="1637" class="lbl-sm" fill="#1e5c1e">Next: rewire GP16/17/18 + VBUS/GND to the MAX98357A per this diagram (disconnect the old R8/Q1/D1/C5 stage), rewrite receiver_test.py to use machine.I2S instead of PWM, then re-test tone/melody/PCM playback.</text>
+  <text x="32" y="1655" class="lbl-sm" fill="#1e5c1e">Component hunt list: R4 220&#8211;330&#8486;, R5 4.7k, R6/R7 2&#215;100k; C1 100&#956;F, C2 100nF, C3 1&#8211;10&#956;F, C4 10nF, C6 100nF; one MAX98357A breakout module (replaces R8/Q1/D1/C5/general NPN/1N4148 from Rev F).</text>
 </svg>
