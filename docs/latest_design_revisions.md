@@ -197,3 +197,34 @@ Done. rotary_dial_circuit_revF.svg (and a rendered rotary_dial_circuit_revF.png)
 What I deliberately did **not** change: no pull-up added to GP3 — Gemini's ">95% confidence" showstopper transposed the 14.5kΩ R_int from the shunt pair onto the pulse pair, which your DMM and dial test log already disproved. I logged that verdict in repo memory so the hallucination doesn't get re-litigated in a future session.
 
 Made changes.
+
+***
+
+User: The demands that our latest revisions place on the MCU are a waste of resources for the Pico. Migrate to an Adafruit ItsyBitsy 32u4 - 5V 16MHz (research + links from Gemini provided). Plan and implement the full set of updates: docs, schematics, and code.
+
+GitHub Copilot: Rev I (2026-07-27) -- MCU migration, Pico (RP2040/MicroPython) -> Adafruit ItsyBitsy 32u4 5V 16MHz (ATmega32u4/Arduino C++).
+
+**Rationale:** After Rev H moved all audio handling off the microcontroller entirely (gutted Logitech USB audio PCB), the Pico's remaining job was just "dial + hook -> USB HID volume/mute" -- a few GPIOs and one custom HID interface. The RP2040's ARM Cortex-M0+, 264KB RAM and 2MB flash were massive overkill for that. The ItsyBitsy 32u4 has native USB HID in silicon (no vendored `usb.device` library needed, unlike the Pico) and just enough I/O, for a fraction of the size/cost/power.
+
+**Research verified (Adafruit product page/learn guide + `adafruit/Adafruit_Arduino_Boards` on GitHub):**
+- ATmega32u4, 5V logic, 16MHz, 28KB usable flash, 2.5KB RAM.
+- Sketch enumerates as **VID 0x239A / PID 0x800E**, product string "ItsyBitsy 32u4 5V 16MHz" (bootloader PID is 0x000E, only seen transiently during upload). FQBN: `adafruit:avr:itsybitsy32u4_5V`.
+- Internal pull-ups are ~20-50kOhm (weaker than the Pico's 50-80kOhm) -- re-verified that the WHITE/SHUNT pair's 14.5kOhm internal bleeder resistor still overpowers them (divider would sit ~2.1V, below the ~3.0V VIH at 5V logic), so the external 2.2kOhm pull-up (R3) is still mandatory, just moved to the 5V rail (open-state ~4.34V).
+- Hardware interrupt-capable pins available: D0(INT2), D1(INT3), D7(INT6) -- assigned to SHUNT/PULSE/HOOK respectively even though the firmware ended up using a polled loop (keeps the ISR option open later).
+- Arduino's `HID.h` (PluggableUSB) requires a Report ID on custom HID report descriptors; the Pico's `usb.device.hid` did not. Wire format changed from 1 byte (`percent`) to 2 bytes (`[reportId=1][percent]`).
+
+**Pin map (new):** SHUNT_IN GP2->D0, PULSE_IN GP3->D1, HOOK_IN GP4->D7, LED_SHUNT GP14->D9, LED_PULSE GP15->D10. Pull-up/EMI-filter rail 3V3->5V. GND unchanged in role.
+
+**Firmware (`firmware/rotary_volume/rotary_volume.ino`, new):** faithful, POLLED (not interrupt-driven) port of `main.py`'s state machine -- same debounce constants (15ms dial, 30ms hook), same digit-to-percent mapping (`N*10%`, `0->100%`), same hook mute/restore semantics, same LED behavior, same vendor HID usage page (0xFF00/usage 0x01) plus the new Report ID. Decided against an interrupt/ring-buffer port: dial pulses are ~10Hz with 38-62ms edges (see `dial_test_log.txt`), so a ~1ms polling loop on a 16MHz AVR has enormous timing margin without ISR/volatile complexity in 2.5KB of RAM. Compiles to 7258 bytes (25% of 28672 byte flash budget). Companion `firmware/led_blink_test/led_blink_test.ino` ported from `led_blink_test.py` for pre-flight LED wiring checks.
+
+**Host daemon (`host/volume_daemon.py`):** VID/PID updated to `239a`/`800e`; report parsing changed to read 2 bytes and validate `data[0] == 0x01` (Report ID) before treating `data[1]` as the percent.
+
+**Repo restructure:** `main.py`, `hid_consumer.py`, `led_blink_test.py` moved to `legacy_pico/` (with a README explaining why they're kept) via `git mv`, preserving history. `dial_test_log.txt` stays at the repo root as a board-agnostic timing reference.
+
+**Schematic:** `docs/rotary_dial_circuit_revI.svg`/`.png` -- copied from Rev H, swapped the Pico body for the ItsyBitsy, relabeled all pins/rail (3V3->5V), corrected internal pull-up value annotations (50-80k->20-50k), updated the R3 pull-up note, and rewrote both analysis boxes to summarize the migration. The USB audio subsystem section (hub + gutted Logitech PCB) is unchanged from Rev H -- this migration only touches the HID/dial/hook side.
+
+**Toolchain:** `arduino-cli` (installed via `pacman`, Arch repo `extra`) with the Adafruit board index (`https://adafruit.github.io/arduino-board-index/package_adafruit_index.json`) and the `adafruit:avr` core. Compile: `arduino-cli compile --fqbn adafruit:avr:itsybitsy32u4_5V firmware/rotary_volume`. Upload: `arduino-cli upload -p /dev/ttyACM0 --fqbn adafruit:avr:itsybitsy32u4_5V firmware/rotary_volume` (uses the onboard Caterina/AVR109 bootloader automatically, no manual reset needed).
+
+**Verified on hardware (2026-07-27):** both sketches compile clean and upload successfully over `/dev/ttyACM0`. `lsusb -v` confirms composite enumeration as `239a:800e` with three interfaces (Communications, CDC Data, HID). Added a new udev rule (`/etc/udev/rules.d/99-itsybitsy.rules`, VID 239a/PID 800e, MODE 0666 for tty/usb/hidraw) since the old Pico rule (VID 2e8a/PID 0005) doesn't match. `host/volume_daemon.py`'s device-discovery function correctly locates `/dev/hidrawN` by the new VID:PID, and the full HID-report -> `pactl set-sink-volume` pipeline was confirmed working end-to-end. Live dial/hook behavior NOT YET verified -- the physical dial/hook/LED wiring hasn't been transferred from the Pico's pins to the new ItsyBitsy pins yet (D0/D1/D7 currently float, which is why the daemon repeatedly saw spurious "100%" reports during the smoke test -- expected noise on unwired inputs, not a firmware bug).
+
+**Remaining TODO:** physically rewire dial/hook/LEDs to the new pin map, re-run the LED blink sanity check, then verify live dial (each digit 1-9,0) and hook mute/restore against a fresh serial log (compare pulse timing to the original `dial_test_log.txt`). Once validated, update `/memories/repo/vintage_headset.md` to supersede the Pico-specific mpremote/MicroPython notes.

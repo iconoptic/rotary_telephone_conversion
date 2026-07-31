@@ -1,0 +1,8 @@
+# Windows-only dependencies for host/volume_daemon.py.
+# Linux needs nothing extra (uses /dev/hidraw + the `pactl` CLI, both stdlib/OS-provided).
+#
+# Install with:
+#   pip install -r host/requirements-windows.txt
+hidapi>=0.14
+pycaw>=20230407
+comtypes>=1.2
