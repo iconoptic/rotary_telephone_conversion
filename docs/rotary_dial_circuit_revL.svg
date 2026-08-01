@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 2674" font-family="monospace" font-size="14">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 2860" font-family="monospace" font-size="14">
   <style>
     .wire   { stroke:#111; stroke-width:2; fill:none; }
     .dash   { stroke:#555; stroke-width:1.5; fill:none; stroke-dasharray:5,4; }
@@ -20,7 +20,7 @@
   <!-- ======================= BACKGROUND ======================= -->
   <rect x="0" y="0" width="1600" height="2580" fill="#f3ecda"/>
 
-  <text x="20" y="28" class="lbl-b" font-size="19">Rotary Phone &#8594; Adafruit ItsyBitsy 32u4 &#8212; Rev K (2026-07-30): bulk caps at T1 tap, T1 pinout, R18 derated, part-number trap flagged</text>
+  <text x="20" y="28" class="lbl-b" font-size="19">Rotary Phone &#8594; Adafruit ItsyBitsy 32u4 &#8212; Rev L (2026-08-01): T1 corrected to the 161G24 (single-primary) actually on hand, pinout and ring frequency updated to match</text>
   <text x="20" y="50" class="lbl-sm">ItsyBitsy 32u4 duties: rotary dial (WHITE=shunt/N1, BLUE=pulse/N2) &#8594; volume digit; GREEN/WHITE switchhook lever (N3) &#8594; mute; and NEW in Rev J, an IR-triggered ring generator for the original bell.</text>
   <text x="20" y="70" class="lbl-sm">Audio is still handled entirely by a gutted Logitech USB headset (M/N A-00008): its own USB audio PCB (DAC + Class-D amp + mic preamp/ADC) drives a Logitech speaker + electret mic mounted inside the handset.</text>
   <text x="20" y="90" class="lbl-sm">An internal 2-port USB hub combines the ItsyBitsy (HID volume/mute) and the Logitech audio PCB (USB Audio) onto the single USB cable leaving the phone -- the PC sees two ordinary USB devices.</text>
@@ -454,21 +454,21 @@
   <line x1="1050" y1="1550" x2="965" y2="1550" class="wire"/>
   <line x1="965" y1="1540" x2="965" y2="1560" class="wire"/>
   <text x="957" y="1554" text-anchor="end" class="lbl-sm">5V</text>
-  <text x="957" y="1570" text-anchor="end" class="lbl-sm" fill="#555">pins 6+7 (jumpered)</text>
-  <text x="1030" y="1436" text-anchor="end" class="lbl-sm" fill="#555">pin 5</text>
-  <text x="1040" y="1676" text-anchor="end" class="lbl-sm" fill="#555">pin 8</text>
+  <text x="957" y="1570" text-anchor="end" class="lbl-sm" fill="#555">pins 4+5 (jumpered)</text>
+  <text x="1030" y="1436" text-anchor="end" class="lbl-sm" fill="#555">pin 3</text>
+  <text x="1040" y="1676" text-anchor="end" class="lbl-sm" fill="#555">pin 6</text>
   <text x="1148" y="1462" class="lbl-sm" fill="#555">pin 1</text>
-  <text x="1148" y="1648" class="lbl-sm" fill="#555">pin 4</text>
+  <text x="1148" y="1648" class="lbl-sm" fill="#555">pin 2</text>
   <line x1="1088" y1="1425" x2="1088" y2="1675" class="wire"/>
   <line x1="1096" y1="1425" x2="1096" y2="1675" class="wire"/>
   <path d="M1140,1470 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20" class="wire"/>
-  <text x="1166" y="1556" class="lbl-sm">HV: 115V+115V</text>
-  <text x="1166" y="1572" class="lbl-sm">in SERIES</text>
-  <text x="1166" y="1588" class="lbl-sm" fill="#555">&#8776; &#177;96V sq.</text>
-  <text x="590" y="1748" class="lbl-sm" fill="#555">T1: an ordinary mains transformer run backwards. LV side = its 24V C.T. secondary used as 12-0-12; HV side = its TWO 115V primaries wired in series (230V) for 19:1.</text>
+  <text x="1166" y="1556" class="lbl-sm">HV: single 115V</text>
+  <text x="1166" y="1572" class="lbl-sm">winding, no jumper</text>
+  <text x="1166" y="1588" class="lbl-sm" fill="#555">&#8776; &#177;48V sq.</text>
+  <text x="590" y="1748" class="lbl-sm" fill="#555">T1: an ordinary mains transformer run backwards. LV = 24V C.T. secondary as 12-0-12; HV = single 115V primary (no series option), 9.6:1.</text>
   <text x="590" y="1764" class="lbl-sm" fill="#555">Q2/Q3: logic-level N-channel MOSFETs, V_GS(th) &lt; 2.5V so 5V fully enhances them; V_DS &#8805; 60V covers the 2x5V push-pull swing plus leakage ringing.</text>
   <text x="590" y="1780" class="lbl-sm" fill="#555">R12/R13 damp gate ringing; R14/R15 hold the gates off while the ItsyBitsy is in reset or unpowered, so the bell can never sit energised.</text>
-  <text x="590" y="1796" class="lbl-sm" fill="#555">T1 pinout (160G24 datasheet): jumper 6-7 = centre tap; jumper 2-3, leave floating (series-aiding). DMM sanity check before power: R(5-8) &#8776; 2x R(5-6).</text>
+  <text x="590" y="1796" class="lbl-sm" fill="#555">T1 pinout (161G24, single primary): jumper 4-5 = centre tap; no primary jumper needed (one winding). DMM check before power: R(3-6) &#8776; 2x R(3-4).</text>
 
   <!-- Secondary -> R18 -> bell RED ; bell BLACK returns underneath -->
   <line x1="1140" y1="1470" x2="1240" y2="1470" class="wire"/>
@@ -511,13 +511,13 @@
   <text x="32" y="1884" class="lbl-sm" fill="#7a4712">Emitter and detector sit next to each other, so some light always leaks straight across. That resting delta is measured once at boot and the trigger sits above it, making this a reflective proximity sensor.</text>
   <text x="32" y="1902" class="lbl-sm" fill="#7a4712">For the planned MCU-less remote this is the wrong receiver: synchronous detection can only see OUR OWN emitter. Swap in a 3-leg 38kHz demodulator (TSOP38238/VS1838B) then and read it as a digital input.</text>
   <text x="32" y="1926" class="lbl-sm" fill="#7a4712">Bell: 5.97k&#8486; DC measured across RED/BLACK. At 5V that is 0.84mA. These coils expect ~90V/20Hz (~15mA), so switching harder at 5V can never work -- the missing ingredient is voltage, not current.</text>
-  <text x="32" y="1944" class="lbl-sm" fill="#7a4712">Q2/Q3 alternately ground the two halves of T1's 12-0-12 LV winding (tap on 5V) and the mains winding drives the bell. Series T1's TWO 115V primaries (230V): 19:1 gives ~&#177;96V and ~15.5mA -- the original spec.</text>
+  <text x="32" y="1944" class="lbl-sm" fill="#7a4712">Q2/Q3 alternately ground the two halves of T1's 12-0-12 LV winding (tap on 5V) and the mains winding drives the bell. T1's single 115V primary: 9.6:1 gives ~&#177;48V and ~7mA -- audible but softer than the ~15mA original spec.</text>
   <text x="32" y="1962" class="lbl-sm" fill="#7a4712">Bipolar drive is required: a polarised ringer's armature is magnetically biased and must see the field reverse to swing between both gongs. Firmware never raises both gates at once (1ms deadband each half-cycle).</text>
-  <text x="32" y="1980" class="lbl-sm" fill="#7a4712">25Hz, not 20Hz: peak flux scales as V/f. A 5V square at 25Hz into a 12V winding is 0.93x the rated flux of a 50/60Hz part but 1.11x for a 60Hz-only part. 20/25/30Hz were all real exchange ringing frequencies.</text>
+  <text x="32" y="1980" class="lbl-sm" fill="#7a4712">30Hz, not 25Hz: peak flux scales as V/f. A 5V square into a 12V winding is 1.11x rated flux at 25Hz on a 60Hz-only core (161G24) -- saturates; 30Hz brings it to 0.93x, the same margin 160G24 had at 25Hz.</text>
   <text x="32" y="1998" class="lbl-sm" fill="#7a4712">No centre tap on your transformer? Drive the whole LV winding from a 4-MOSFET H-bridge instead -- at 5V even the high-side devices can be logic-level P-channel FETs driven straight from the pins. Firmware is unchanged.</text>
   <text x="32" y="2016" class="lbl-sm" fill="#7a4712">GREY pair stays exactly as found: insulated and unconnected. On many ringers it is a coil tap, and bonding it would short out part of the winding.</text>
-  <text x="32" y="2034" class="lbl-sm" fill="#7a4712">Buy Hammond 160G24 (Mouser 546-160G24) -- NOT 161G24, which is single-primary/60Hz-only and cannot do the series trick. Triad VPL24-210 (5VA, dual primary, dual 12V) also works. Verified 2026-07-30.</text>
-  <text x="32" y="2052" class="lbl-sm" fill="#a03a3a">SAFETY: in the 230V configuration the secondary swings ~&#177;96V at ~15mA -- the same jolt a real phone line gives installers. Isolated from USB and limited by R18, but insulate it and never probe while ringing.</text>
+  <text x="32" y="2034" class="lbl-sm" fill="#7a4712">Part on hand is Hammond 161G24 (single-primary, 60Hz-only) -- softer ring than the originally-specified dual-primary 160G24, but no extra parts or firmware changes needed. 160G24/VPL24-210 remain drop-in upgrades.</text>
+  <text x="32" y="2052" class="lbl-sm" fill="#a03a3a">SAFETY: the secondary swings ~&#177;48V at ~7mA -- softer than a real phone line's jolt but still a genuine shock. Isolated from USB and limited by R18, but insulate it and never probe while ringing.</text>
 
   <!-- ======================= ANALYSIS BOXES ======================= -->
   <rect x="20" y="2080" width="1550" height="100" fill="#e3ecf7" stroke="#3a6ea5" stroke-width="1.5"/>
@@ -548,5 +548,14 @@
   <text x="32" y="2551" class="lbl-sm" fill="#6d2359">Ring-freq floor raised 15Hz-&gt;23Hz (below 23Hz the core saturates under a 5V square drive). Also added an AVR watchdog (WDTO_250MS) so a firmware hang can never leave a bell gate latched HIGH.</text>
   <text x="32" y="2569" class="lbl-sm" fill="#a03a3a">DEPENDENCY NOTE: Q2/Q3 leakage-inductance turn-off spikes are absorbed by the STP55NF06L's avalanche rating (no RC snubber fitted -- energy is uJ vs its 300mJ single-pulse rating, ~4 orders of margin).</text>
   <text x="32" y="2587" class="lbl-sm" fill="#a03a3a">If substituting Q2/Q3, the replacement MUST be avalanche-rated and &gt;=60V, or add a 100&#8486;+10nF RC snubber across each half-winding (see docs/revK_design_review/03_bell_failure_modes.md).</text>
-  <text x="32" y="2605" class="lbl-sm" fill="#6d2359">TODO: build the T1/Q2/Q3 stage and confirm ~190Vpp on the secondary BEFORE attaching RED/BLACK, then tune IR_TRIGGER_MARGIN from the live &#8220;IR delta&#8221; serial prints. The MCU-less remote stays out of scope for now.</text>
+  <text x="32" y="2605" class="lbl-sm" fill="#6d2359">TODO: build the T1/Q2/Q3 stage and confirm ~95Vpp on the secondary BEFORE attaching RED/BLACK, then tune IR_TRIGGER_MARGIN from the live &#8220;IR delta&#8221; serial prints. The MCU-less remote stays out of scope for now.</text>
+
+  <rect x="20" y="2645" width="1550" height="160" fill="#fdf1e0" stroke="#b06a1f" stroke-width="1.5"/>
+  <text x="32" y="2665" class="lbl-b" fill="#7a4712">Rev L summary &#8212; T1 corrected to the 161G24 actually on hand (2026-08-01)</text>
+  <text x="32" y="2685" class="lbl-sm" fill="#7a4712">Design/build were all done against a dual-primary Hammond 160G24, but the part in hand is a single-primary 161G24 (60Hz-only) -- no series-for-230V trick is possible on one winding.</text>
+  <text x="32" y="2703" class="lbl-sm" fill="#7a4712">Ratio drops 19:1 -&gt; 9.6:1: expect ~&#177;48V/~7mA, not ~&#177;96V/~15mA. Still audible and rings the bell -- just softer than the original exchange spec.</text>
+  <text x="32" y="2721" class="lbl-sm" fill="#7a4712">Pin numbers changed (161G24 connection diagram): LV jumper moved 6-7-&gt;4-5, drain pins 5/8-&gt;3/6; HV side needs no jumper at all (single winding, pins 1/2).</text>
+  <text x="32" y="2739" class="lbl-sm" fill="#7a4712">Firmware ring-frequency floor raised 23Hz-&gt;28Hz, default 25Hz-&gt;30Hz: 161G24's 60Hz-only core needs a higher frequency than 160G24's 50/60Hz core for the same margin.</text>
+  <text x="32" y="2757" class="lbl-sm" fill="#7a4712">5V-side ring current drops ~300mA -&gt; ~75mA (power &#8733; ratio&#178;), so a self-powered USB hub is no longer strictly required, though still good practice.</text>
+  <text x="32" y="2775" class="lbl-sm" fill="#7a4712">Upgrade path unchanged: swapping in a 160G24 or Triad VPL24-210 later restores the full ~96V/~15mA design with no firmware change -- only T1's pin wiring reverts to the Rev K numbers above.</text>
 </svg>

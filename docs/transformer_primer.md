@@ -3,6 +3,21 @@
 **Context:** picking T1 for the Rev J bell ring generator.
 **Verdict:** Hammond **160G24**. Why, and how to read the sheet that says so.
 
+> **UPDATE (2026-08-01, Rev L):** the part actually on hand turned out to be
+> the **161G24** (single-primary, 60Hz-only), not the 160G24 this whole
+> document argues for. Everything below is kept as-is because the reasoning
+> (why a 24V C.T./10VA winding, the flux-vs-frequency math, why dual-primary
+> is *better*) is still correct and still the reason to upgrade later — it
+> just isn't what got built. With the 161G24: ratio is 115:12 = 9.6:1 (not
+> 19:1), so expect ~±48V/~7mA (not ~±96V/~15mA) — audible, just softer than
+> the original ringing spec. Pin numbers differ too: the 161G24's secondary
+> (drive) side is pins 3-4-5-6 (jumper 4-5 = centre tap, pins 3 & 6 = the
+> two ends) instead of the 160G24's 5-6-7-8 (jumper 6-7, pins 5 & 8), and its
+> single primary is just pins 1-2 with no series jumper. See
+> `docs/rotary_dial_circuit_revL.svg` and the Rev L summary box on it for
+> the current, as-built numbers; a 160G24 or Triad VPL24-210 remain drop-in
+> upgrades later with no firmware change.
+
 ---
 
 ## TL;DR

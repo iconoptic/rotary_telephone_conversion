@@ -6,7 +6,7 @@
   first when bringing up the new ringer driver and IR pair so a fault can
   only be in the new hardware.
 
-  WIRING (docs/rotary_dial_circuit_revJ.svg):
+  WIRING (docs/rotary_dial_circuit_revL.svg):
     D5  IR_TX   -> R10 150ohm -> IR emitter LED anode; cathode to GND.
     A0  IR_RX   -> IR phototransistor emitter; collector to 5V;
                    R11 10kohm from this pin to GND.
@@ -19,25 +19,32 @@
     were in the phone. C7+C8 (2x 470uF/16V in parallel, ~940uF) from the
     centre-tap 5V feed to GND: the ring pulls ~300mA bursts from 5V.
 
-    T1 = dual-primary 115/230V mains transformer with a 24V C.T. (or dual
-    12V) low-voltage winding, run backwards. Wire the TWO 115V primaries
-    in SERIES for 19:1 (~+/-96V, ~15.5mA). Verified fits: Hammond 160G24
-    (Mouser 546-160G24 -- NOT 161G24, single primary), Triad VPL24-210.
-    160G24 pinout: jumper 6-7 = centre tap -> 5V; pin 5 -> Q2 drain,
-    pin 8 -> Q3 drain; jumper 2-3 (leave floating); pin 1 -> R18 -> RED,
-    pin 4 -> BLACK. DMM check before power: R(5-8) ~ 2x R(5-6).
+    T1 = Hammond 161G24: SINGLE-primary 115V/60Hz-only mains transformer
+    (confirmed the part actually on hand -- NOT the dual-primary 160G24
+    this design originally targeted), 24V C.T. low-voltage winding, run
+    backwards. With only one primary there is no series-for-230V trick:
+    ratio is 115:12 = 9.6:1, giving ~+/-48V, ~7.7mA ideal (~7mA realistic
+    after winding DCR) -- audible but noticeably softer than the ~15mA
+    original ringing spec. Swapping in a Hammond 160G24 later (series its
+    two 115V primaries for 19:1, ~+/-96V/~15mA) is a drop-in upgrade: same
+    firmware, only the T1 pin numbers below change (see revK.svg history).
+    161G24 pinout (Hammond 161-schematic-rev2, verified against the actual
+    datasheet drawing): secondary (LV, drive) jumper pins 4-5 = centre tap
+    -> 5V; pin 3 -> Q2 drain, pin 6 -> Q3 drain. Primary (HV out, single
+    winding, no jumper needed): pin 1 -> R18 -> bell RED, pin 2 -> BLACK.
+    DMM check before power: R(3-6) ~ 2x R(3-4).
 
-  SAFETY: in the series configuration T1's high-voltage winding swings
-  roughly +/-96V at ~15mA -- the same jolt a real phone line delivers. It
-  is isolated from USB and limited by R18 plus the 5.97k coil, but insulate
-  it properly and do not probe it while ringing.
+  SAFETY: T1's high-voltage winding swings roughly +/-48V at ~7mA -- softer
+  than a real phone line's jolt but still a real shock. It is isolated from
+  USB and limited by R18 plus the 5.97k coil, but insulate it properly and
+  do not probe it while ringing.
 
   Serial commands (115200 baud, one character each):
     r  ring the standard cadence (2s ring / 4s pause, 2 bursts)
     h  hold a continuous ring until 's' (for measuring / tuning)
     s  stop immediately
-    a  drive BELL_A gate on only (DC) for 1s -- half-winding continuity test
-    b  drive BELL_B gate on only (DC) for 1s -- half-winding continuity test
+    a  drive BELL_A gate on only (DC) for 10ms -- half-winding continuity test
+    b  drive BELL_B gate on only (DC) for 10ms -- half-winding continuity test
     i  print one IR sample (dark / lit / delta)
     c  recalibrate the IR baseline
     +  raise the ring frequency by 1Hz    - lower it by 1Hz
@@ -57,9 +64,19 @@ static const unsigned long RING_GAP_MS = 4000;
 static const uint8_t RING_BURSTS = 2;
 static const unsigned int IR_SETTLE_US = 200;
 static const uint8_t IR_CALIBRATION_SAMPLES = 32;
+// DC continuity test: a transformer winding held at DC current is just its
+// ~2ohm DCR -- 1s at 5V would ramp toward ~2.5A. 10ms keeps it on the
+// inductive rise, well under 1A, while still confirming the gate/FET/winding
+// path is alive (the DMM R(5-8)~=2xR(5-6) check already proves continuity
+// unpowered; this is a quick powered sanity check, not a substitute for it).
+static const unsigned long DC_TEST_MS = 10;
 
-uint8_t ringFreqHz = 25;               // 0.93x rated flux on a 50/60Hz core, 1.11x on a 60Hz-only one
-unsigned long halfPeriodMs = 20;
+// 161G24's LV winding is rated 60Hz-only (flux ratio = 333/(hz*12) vs
+// 277.5/(hz*12) for a 50/60Hz-rated core like 160G24) -- needs a higher
+// default frequency to stay under saturation: 30Hz -> 0.93x rated flux,
+// matching the same safety margin the 160G24 design used at 25Hz.
+uint8_t ringFreqHz = 30;
+unsigned long halfPeriodMs = 500 / 30;
 
 enum Mode : uint8_t { IDLE, CADENCE_BURST, CADENCE_GAP, HOLD, DC_A, DC_B };
 Mode mode = IDLE;
@@ -68,6 +85,10 @@ unsigned long modeStartMs = 0;
 unsigned long toggleMs = 0;
 bool phaseB = false;
 bool inDeadband = false;
+// Push-pull soft-start: from zero flux, a full-length first half-cycle would
+// drive the core to ~1.86x rated flux (deep saturation, amp-class current
+// spike). Halving only the first half-cycle's length bounds it to ~0.93x.
+bool firstHalfCycle = false;
 
 int irBaseline = 0;
 unsigned long lastIrPrintMs = 0;
@@ -78,7 +99,11 @@ static void gatesOff() {
 }
 
 static void setRingFreq(uint8_t hz) {
-  if (hz < 15) hz = 15;
+  // 28Hz is the saturation floor for a 5V square into 161G24's 60Hz-only-
+  // rated 12V half-winding (flux ratio = 27.75/hz, i.e. 333/(hz*12));
+  // lower and the core saturates hard. (160G24's 50/60Hz-rated core floor
+  // was 23Hz -- lower, since that core has more margin at a given freq.)
+  if (hz < 28) hz = 28;
   if (hz > 40) hz = 40;
   ringFreqHz = hz;
   halfPeriodMs = 500UL / hz;
@@ -95,6 +120,7 @@ static void startOscillation(Mode m, unsigned long now) {
   toggleMs = now;
   phaseB = false;
   inDeadband = true;
+  firstHalfCycle = true;  // soft-start: first half-cycle from idle is half-length
   burstsLeft = (m == CADENCE_BURST) ? RING_BURSTS : 0;
   gatesOff();
 }
@@ -107,11 +133,13 @@ static void stopAll() {
 }
 
 static void oscillate(unsigned long now) {
-  if (now - toggleMs >= halfPeriodMs) {
+  unsigned long thisHalfMs = firstHalfCycle ? (halfPeriodMs / 2) : halfPeriodMs;
+  if (now - toggleMs >= thisHalfMs) {
     gatesOff();
     toggleMs = now;
     phaseB = !phaseB;
     inDeadband = true;
+    firstHalfCycle = false;
   } else if (inDeadband && (now - toggleMs) >= RING_DEADBAND_MS) {
     digitalWrite(phaseB ? BELL_B_PIN : BELL_A_PIN, HIGH);
     inDeadband = false;
@@ -182,7 +210,7 @@ void loop() {
       break;
     case DC_A:
     case DC_B:
-      if (now - modeStartMs >= 1000) {
+      if (now - modeStartMs >= DC_TEST_MS) {
         gatesOff();
         mode = IDLE;
         Serial.println(F("DC test done"));
@@ -222,14 +250,14 @@ void loop() {
         stopAll();
         break;
       case 'a':
-        Serial.println(F("DC on BELL_A gate for 1s"));
+        Serial.println(F("DC on BELL_A gate for 10ms"));
         gatesOff();
         mode = DC_A;
         modeStartMs = now;
         digitalWrite(BELL_A_PIN, HIGH);
         break;
       case 'b':
-        Serial.println(F("DC on BELL_B gate for 1s"));
+        Serial.println(F("DC on BELL_B gate for 10ms"));
         gatesOff();
         mode = DC_B;
         modeStartMs = now;

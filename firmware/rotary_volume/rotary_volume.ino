@@ -62,28 +62,54 @@
   (needed by a polarised ringer, whose armature must swing both ways) with
   NO high-voltage switching devices.
 
-  T1 CHOICE (verified against datasheets 2026-07-30): use a DUAL-primary
-  115/230V part and wire the two 115V primaries in SERIES. Against the 12V
-  half-winding that is 19:1, giving ~+/-96V and ~15.5mA -- the original
-  ringing spec. A single 115V primary is only 9.6:1 (~+/-48V, ~7.7mA):
-  audible but noticeably soft. Good fits: Hammond 160G24 (10VA, 24V C.T.
-  @ 450mA; Mouser 546-160G24 -- NOT 161G24, which is single primary) or
-  Triad VPL24-210 (5VA, dual 12V secondaries, series them).
-  160G24 pinout: jumper 6-7 = centre tap -> 5V; pins 5/8 -> Q2/Q3 drains;
-  jumper 2-3 (floating); pin 1 -> R18 220ohm -> bell RED, pin 4 -> BLACK.
+  T1 CHOICE (revised 2026-08-01: the part actually on hand is a Hammond
+  161G24, SINGLE-primary 115V/60Hz-only -- not the dual-primary 160G24
+  this design originally targeted). With only one primary there is no
+  series-for-230V trick: ratio against the 12V half-winding is 115:12 =
+  9.6:1, giving ~+/-48V and ~7.7mA ideal (~7mA realistic) -- audible but
+  noticeably softer than the ~15mA original ringing spec. A dual-primary
+  160G24 (10VA, 24V C.T. @ 450mA; Mouser 546-160G24) or Triad VPL24-210
+  remain drop-in upgrades later for the full ~96V/~15mA original spec --
+  series their two 115V primaries for 19:1; only T1's pin numbers change,
+  firmware is identical.
+  161G24 pinout (verified against Hammond's own connection diagram, not
+  just the part-number table): secondary (LV, drive) jumper pins 4-5 =
+  centre tap -> 5V; pin 3 -> Q2 drain, pin 6 -> Q3 drain. Primary (HV
+  out, single winding, no jumper needed): pin 1 -> R18 220ohm -> bell
+  RED, pin 2 -> BLACK.
   Bulk caps C7+C8 (2x 470uF/16V parallel) at the centre-tap 5V feed: the
-  ring pulls ~300mA bursts, so prefer a self-powered USB hub.
+  ring pulls bursts from 5V (smaller now, ~75mA vs the 160G24's ~300mA --
+  output power scales with the square of the voltage ratio, and this
+  ratio is half), so a self-powered USB hub is no longer strictly required
+  but is still good practice.
 
-  Why 25Hz and not the traditional 20Hz: peak flux scales as V/f, so a 5V
-  square at 25Hz into a 12V winding sits at 0.93x the rated flux of a
-  50/60Hz-rated transformer (but 1.11x for a 60Hz-only one). Real exchanges
-  used 20/25/30Hz, so 25Hz is well inside the ringer's mechanical resonance
-  band. Raise RING_FREQ_HZ toward 30 if the transformer buzzes or warms up.
+  Why 30Hz and not 25Hz: peak flux scales as V/f, so a 5V square into a
+  12V winding sits at 333/(hz*12) rated flux on a 60Hz-only-rated core
+  like 161G24 (vs 277.5/(hz*12) for a 50/60Hz-rated core like 160G24).
+  25Hz would be 1.11x rated (saturates); 30Hz is 0.93x, the same safety
+  margin the original 160G24 design used at 25Hz. Real exchanges used
+  20/25/30Hz, so 30Hz is still well inside the ringer's mechanical
+  resonance band. Raise RING_FREQ_HZ further if the transformer buzzes.
 
   BELL_A and BELL_B are NEVER high at the same time -- a deadband of one
   poll tick (>=1ms) is inserted at every half-cycle transition, because
   energising both half-windings at once just burns current in opposing
   flux.
+
+  SOFT-START: from zero flux, a full-length (20ms) first half-cycle would
+  drive the core to ~1.86x rated flux (deep saturation, amp-class current
+  spike, possible brownout right as the phone tries to ring). The first
+  half-cycle after any idle period or inter-burst gap is therefore
+  half-length (10ms), the textbook push-pull soft-start fix -- see
+  bellFirstHalfCycle in bellStart()/bellUpdate().
+
+  WATCHDOG: wdt_enable(WDTO_250MS) + a per-loop wdt_reset() guarantee that a
+  firmware hang can never leave a bell gate latched HIGH indefinitely (the
+  gate pulldowns R14/R15 only protect reset/Hi-Z, not a live-but-stuck pin).
+  A .init3 handler clears MCUSR/disables the WDT immediately after any
+  reset, because the 32u4's Caterina bootloader does not do this itself --
+  without that guard, a watchdog-caused reset can loop forever in the
+  bootloader instead of ever reaching setup().
 
   IR DETECTION THEORY: with a bare (2-leg) phototransistor there is no
   38kHz demodulator, so ambient light is rejected by SYNCHRONOUS sampling
@@ -116,6 +142,17 @@
 */
 
 #include <HID.h>
+#include <avr/wdt.h>
+
+// The 32u4's Caterina bootloader does not clear MCUSR/disable the watchdog
+// on its own, so a watchdog-caused reset can loop forever in the bootloader
+// instead of ever reaching setup(). This runs in .init3, before global init,
+// and clears it -- setup() re-enables the watchdog deliberately below.
+void wdtEarlyDisable(void) __attribute__((naked)) __attribute__((section(".init3")));
+void wdtEarlyDisable(void) {
+  MCUSR = 0;
+  wdt_disable();
+}
 
 // ---- Pin assignments ----
 static const uint8_t SHUNT_PIN = 0;      // D0 / INT2 -- White pair, ext. 2.2k pull-up to 5V
@@ -135,7 +172,7 @@ static const unsigned long HOOK_DEBOUNCE_MS = 30;  // heavier spring-loaded leve
 static const unsigned long POLL_MS = 1;            // main loop poll cadence
 
 // ---- Bell ring generator ----
-static const unsigned long RING_HALF_PERIOD_MS = 20;  // 20ms half-cycle => 25Hz
+static const unsigned long RING_HALF_PERIOD_MS = 17;  // ~29.4Hz, 0.94x rated flux (161G24, 60Hz-only core)
 static const unsigned long RING_DEADBAND_MS = 1;      // both gates low across a transition
 static const unsigned long RING_BURST_MS = 2000;      // "ring" portion of the cadence
 static const unsigned long RING_GAP_MS = 4000;        // "silence" portion
@@ -192,6 +229,12 @@ unsigned long bellCadenceStartMs = 0;  // start of the current burst or gap
 unsigned long bellToggleMs = 0;        // start of the current half-cycle
 bool bellPhaseB = false;               // which half-winding is next
 bool bellInDeadband = false;
+// Push-pull soft-start: from zero flux, a full-length first half-cycle would
+// drive the core to ~1.86x rated flux (deep saturation, amp-class current
+// spike, possible brownout). Halving only the first half-cycle after any
+// idle/gap bounds it to ~0.93x, matching steady-state symmetry from the
+// second half-cycle onward.
+bool bellFirstHalfCycle = false;
 
 int irBaseline = 0;
 uint8_t irHits = 0;
@@ -229,6 +272,7 @@ static void bellStart(unsigned long now) {
   bellToggleMs = now;
   bellPhaseB = false;
   bellInDeadband = true;  // first half-cycle starts after one deadband tick
+  bellFirstHalfCycle = true;
   bellGatesOff();
   Serial.println(F("*** BELL: ringing ***"));
 }
@@ -244,6 +288,7 @@ static void bellUpdate(unsigned long now) {
         bellCadenceStartMs = now;
         bellToggleMs = now;
         bellInDeadband = true;
+        bellFirstHalfCycle = true;
       }
       return;
 
@@ -260,14 +305,18 @@ static void bellUpdate(unsigned long now) {
         }
         return;
       }
-      if (now - bellToggleMs >= RING_HALF_PERIOD_MS) {
-        bellGatesOff();
-        bellToggleMs = now;
-        bellPhaseB = !bellPhaseB;
-        bellInDeadband = true;
-      } else if (bellInDeadband && (now - bellToggleMs) >= RING_DEADBAND_MS) {
-        digitalWrite(bellPhaseB ? BELL_B_PIN : BELL_A_PIN, HIGH);
-        bellInDeadband = false;
+      {
+        unsigned long thisHalfMs = bellFirstHalfCycle ? (RING_HALF_PERIOD_MS / 2) : RING_HALF_PERIOD_MS;
+        if (now - bellToggleMs >= thisHalfMs) {
+          bellGatesOff();
+          bellToggleMs = now;
+          bellPhaseB = !bellPhaseB;
+          bellInDeadband = true;
+          bellFirstHalfCycle = false;
+        } else if (bellInDeadband && (now - bellToggleMs) >= RING_DEADBAND_MS) {
+          digitalWrite(bellPhaseB ? BELL_B_PIN : BELL_A_PIN, HIGH);
+          bellInDeadband = false;
+        }
       }
       return;
   }
@@ -343,10 +392,14 @@ void setup() {
     Serial.println(F("%"));
     sendVolumePercent(lastVolumePercent);
   }
+
+  wdt_enable(WDTO_250MS);  // a firmware hang can never leave a bell gate latched HIGH
 }
 
 void loop() {
   unsigned long now = millis();
+
+  wdt_reset();
 
   // The ring generator gets serviced on every pass, not just on poll ticks,
   // so its 20ms half-cycles stay square.
