@@ -51,7 +51,10 @@ The cost of the trick (nothing is free):
 - Each **off** FET sees ~**2×Vin = 10 V** on its drain (its half-winding has
   −5 V induced across it while the other half conducts, and the drain hangs
   off the far end). This is why push-pull FETs are always rated ≥ 2×supply
-  plus margin — the 60 V STP55NF06L has ~6× headroom. ✅
+  plus margin — the 60 V STP55NF06L has ~6× headroom. ✅ (**Rev M:** the part
+  on hand is the **IRFZ44N**, 55 V — still ~5× headroom over the ~10.7 V
+  clamp, and an RC snubber is now fitted to catch the leakage spike; see
+  [03](03_bell_failure_modes.md#-finding-no-snubber).)
 - The transformer must be driven **symmetrically** or its core drifts toward
   saturation ("flux walking" — covered in
   [03_bell_failure_modes.md](03_bell_failure_modes.md#-finding-flux-walking)).
@@ -177,6 +180,12 @@ answer has two parts:
   **µJ range vs. the STP55NF06L's hundreds-of-mJ avalanche rating** — fine,
   but it's an *implicit* dependency. Details:
   [03_bell_failure_modes.md](03_bell_failure_modes.md#-finding-no-snubber).
+
+  > **Rev M update:** an RC snubber *is* now fitted — R16/R17 100 Ω +
+  > C9/C10 10 nF, one across each half-winding — because the on-hand IRFZ44N
+  > is a 55 V part (under the 60 V rule), so the leakage spike is now clamped
+  > rather than left to the avalanche rating. The IRFZ44N is itself
+  > avalanche-rated (E_AS 530 mJ, E_AR 9.4 mJ) as a backstop.
 
 ---
 

@@ -18,6 +18,14 @@
 > the current, as-built numbers; a 160G24 or Triad VPL24-210 remain drop-in
 > upgrades later with no firmware change.
 
+> **UPDATE (2026-08-01, Rev M):** T1 is unchanged from Rev L; what changed is
+> the push-pull FETs Q2/Q3. The parts on hand are **IRFZ44N** (55V, not true
+> logic-level) instead of the spec'd 60V STP55NF06L. Because 55V is under the
+> 60V rule, an RC snubber (R16/R17 100Ω + C9/C10 10nF, one across each
+> half-winding) is now fitted to clamp the leakage spike. This does not touch
+> any transformer reasoning below. See `docs/rotary_dial_circuit_revM.svg` and
+> `docs/revK_design_review/03_bell_failure_modes.md`.
+
 ---
 
 ## TL;DR

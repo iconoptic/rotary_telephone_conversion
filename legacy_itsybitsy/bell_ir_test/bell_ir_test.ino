@@ -10,8 +10,10 @@
     D5  IR_TX   -> R10 150ohm -> IR emitter LED anode; cathode to GND.
     A0  IR_RX   -> IR phototransistor emitter; collector to 5V;
                    R11 10kohm from this pin to GND.
-    D2  BELL_A  -> R12 100ohm -> gate of Q2 (R14 10k gate-to-GND).
-    D3  BELL_B  -> R13 100ohm -> gate of Q3 (R15 10k gate-to-GND).
+    D2  BELL_A  -> R12 100ohm -> gate of Q2 = IRFZ44N (R14 10k gate-to-GND).
+                   RC snubber R16 100ohm + C9 10nF, Q2 drain -> 5V tap.
+    D3  BELL_B  -> R13 100ohm -> gate of Q3 = IRFZ44N (R15 10k gate-to-GND).
+                   RC snubber R17 100ohm + C10 10nF, Q3 drain -> 5V tap.
     Q2/Q3 sources to GND, drains to the two ends of T1's centre-tapped
     low-voltage winding; centre tap to 5V. T1's mains-side winding -> R18
     220ohm (>=0.25W is plenty: ~53mW actual) -> bell RED and BLACK leads.
@@ -33,6 +35,11 @@
     -> 5V; pin 3 -> Q2 drain, pin 6 -> Q3 drain. Primary (HV out, single
     winding, no jumper needed): pin 1 -> R18 -> bell RED, pin 2 -> BLACK.
     DMM check before power: R(3-6) ~ 2x R(3-4).
+
+    Q2/Q3 = IRFZ44N (on hand): 55V, not true logic-level, but fine at 5V
+    for this ~0.3A load. 55V is under the 60V rule, so the R16/R17+C9/C10
+    snubbers above clamp the leakage turn-off spike; the part is also
+    fully avalanche-rated as a backstop. See docs/rotary_dial_circuit_revM.svg.
 
   SAFETY: T1's high-voltage winding swings roughly +/-48V at ~7mA -- softer
   than a real phone line's jolt but still a real shock. It is isolated from

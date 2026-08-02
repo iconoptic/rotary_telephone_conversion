@@ -12,6 +12,12 @@
 > adversarial pass that checked this review's own claims and caught one real
 > physics error (§5 below / finding 15).
 
+> **Rev M update (2026-08-01):** finding 7 is now *resolved*, not just
+> documented — the FET on hand is the 55 V IRFZ44N, so an RC snubber
+> (R16/R17 100 Ω + C9/C10 10 nF per half-winding) is **fitted** on
+> [rotary_dial_circuit_revM.svg](../rotary_dial_circuit_revM.svg). This also
+> retires the repetitive-avalanche concern (finding 15).
+
 ---
 
 ## 🔴 Significant (2) — ✅ both fixed 2026-08-01
@@ -34,7 +40,7 @@
 
 | # | Finding | Verdict |
 |---|---------|---------|
-| 7 | No snubber on Q2/Q3 — leakage spikes absorbed by avalanche rating (µJ vs 100s of mJ: ~4 orders of margin) | Fine for this duty cycle; **dependency now documented directly on the schematic** — substitutes must be avalanche-rated, ≥60 V (see also finding 15 in [07](07_gemini_review_audit.md) for the repetitive-avalanche nuance) |
+| 7 | No snubber on Q2/Q3 — leakage spikes absorbed by avalanche rating (µJ vs 100s of mJ: ~4 orders of margin) | **Rev M: RC snubber now FITTED** (R16/R17 100 Ω + C9/C10 10 nF per half-winding) because the on-hand FET is the 55 V IRFZ44N. Snubbed + avalanche-rated = ample margin; this also settles finding 15 in [07](07_gemini_review_audit.md) |
 | 8 | Flux walking from `millis()` jitter (~±1 ms on 20 ms half-cycles) | Bounded to ~60 mA DC offset by winding DCR; self-limiting |
 | 9 | Bell current will be ~13 mA, not 15.5 mA (copper losses ~16%, plus coil inductance above its 5.97 kΩ DCR) | Loudness estimate, not a fault; judge by ear |
 | 10 | C7/C8 = 940 µF exceeds USB 2.0's 10 µF hot-plug inrush allowance | Compliance nit; universally tolerated; moot with self-powered hub |
@@ -54,8 +60,12 @@ Deliberately listed so future-you doesn't "fix" them:
    tap, where they are.
 2. **The FETs are "oversized" (60 V/35 A for a 10 V/300 mA job).** Correct —
    the 60 V covers 2×Vin plus unclamped leakage ringing, and the avalanche
-   rating *is* the snubber (finding 7). IRFZ44N at 55 V/non-logic-level was
-   rightly rejected.
+   rating *is* the snubber (finding 7). **Rev M update:** the part actually
+   on hand is the **IRFZ44N** (55 V, not true logic-level). It was first
+   rejected for being *under* the 60 V rule, but is now **adopted with an RC
+   snubber fitted** (finding 7) so the leakage spike is clamped rather than
+   left to avalanche — thrifty *and* safe. At a 5 V gate it still passes ~10 A
+   vs the ~0.3 A load, so "not logic-level" is a non-issue here.
 3. **R18 "only" 0.25 W.** Correct — 53 mW actual, 4.7× margin. The earlier
    1 W spec was the error.
 4. **Flyback diodes appear to be "missing" on T1.** Correct — the push-pull
@@ -87,8 +97,9 @@ Deliberately listed so future-you doesn't "fix" them:
 2. ~~Apply firmware fixes for findings 1, 2, 3 first~~ — done 2026-08-01,
    both sketches recompile clean (9060/28672 B and 6116/28672 B).
 3. First power: bell **disconnected**, scope on T1 secondary → expect
-   ~±96 V/190 Vpp square at 25 Hz; scope a drain → expect ~10 V flat top +
-   brief leakage spike ≪ 60 V.
+   ~±48 V/~95 Vpp square at ~30 Hz (Rev L/M 161G24; a 160G24 upgrade would
+   give ~±96 V/190 Vpp at 25 Hz); scope a drain → expect ~10 V flat top + a
+   brief leakage spike, now snubber-clamped well under the 55 V IRFZ44N rating.
 4. Watch the 5 V rail during a ring start — sag should stay above the AVR
    brownout with the soft-start fix in place.
 5. Connect the bell, ring, tune loudness expectations to ~13 mA reality.

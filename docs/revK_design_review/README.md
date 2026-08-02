@@ -51,12 +51,21 @@ vintage load). But the adversarial pass found real items:
   15→23 Hz and an AVR watchdog was added (both fixed); bell current is
   overestimated (inductance ignored, informational only); no snubber on
   leakage-inductance spikes (saved by avalanche-rated FETs, dependency now
-  noted directly on the schematic); IR settle time is marginal vs.
+  noted directly on the schematic — **Rev M now *fits* the snubber**, since the
+  on-hand FET is the 55 V IRFZ44N); IR settle time is marginal vs.
   phototransistor speed (needs real hardware to tune, left as-is).
 - 🟢 **A pile of green-lights** — things that *look* wrong but are actually
   fine, documented so future-you doesn't "fix" them.
 
 Details and receipts: [06_findings_summary.md](06_findings_summary.md).
+
+> **Rev M (2026-08-01):** Q2/Q3 are now the **IRFZ44N** parts on hand (55 V,
+> fully avalanche-rated) instead of the spec'd 60 V STP55NF06L. Because 55 V is
+> *under* the 60 V rule, the previously-optional RC snubber (R16/R17 100 Ω +
+> C9/C10 10 nF, one per half-winding) is now **fitted** — which also settles the
+> repetitive-avalanche debate in [07](07_gemini_review_audit.md). At a 5 V gate
+> the IRFZ44N still passes ~10 A vs the ~0.3 A load, so "not true logic-level"
+> is a non-issue here. See [rotary_dial_circuit_revM.svg](../rotary_dial_circuit_revM.svg).
 
 ---
 
@@ -66,13 +75,15 @@ Details and receipts: [06_findings_summary.md](06_findings_summary.md).
 - **⚠️ = adversarial finding** (something that could bite).
 - **✅ = verified-fine** (looks scary, checked, actually OK).
 - **📖 = background** (the EE-curriculum depth that CE breadth skipped).
-- Component names (`Q2`, `R18`, `T1`…) match the Rev K schematic exactly.
+- Component names (`Q2`, `R18`, `T1`…) match the Rev K schematic exactly
+  (Rev M adds the `R16`/`R17` + `C9`/`C10` snubber).
 
 ## 🔗 Primary sources consulted
 
 | Fact | Source |
 |------|--------|
 | STP55NF06L: 60 V, 0.014 Ω typ, logic-level, "100% avalanche tested" | [ST product page](https://www.st.com/en/power-transistors/stp55nf06l.html) |
+| IRFZ44N (Rev M, on hand): 55 V, R_DS(on) 17.5 mΩ @ V_GS=10 V, V_GS(th) 2–4 V, fully avalanche-rated (E_AS 530 mJ, E_AR 9.4 mJ) | International Rectifier / Infineon IRFZ44NPbF datasheet (PD-94787B) |
 | Hammond 160G24: dual 115/230 V primary, 10 VA, 24 V C.T. @ 450 mA | [Hammond part page](https://www.hammfg.com/part/160G24) |
 | ItsyBitsy 32u4 5V: "5V" pin good for 500 mA when USB-powered | [Adafruit pinout guide](https://learn.adafruit.com/introducting-itsy-bitsy-32u4/pinouts) |
 | Push-pull: deadtime/shoot-through, back-EMF peaks when both switches off | [Wikipedia: push–pull converter](https://en.wikipedia.org/wiki/Push%E2%80%93pull_converter) |

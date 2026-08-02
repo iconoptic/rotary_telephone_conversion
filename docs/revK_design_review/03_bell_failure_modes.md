@@ -139,12 +139,20 @@ drain above the 10.7 V clamp ([02 §6](02_bell_ring_generator.md)).
 
 So no snubber is a *defensible* omission — **but it's an undocumented
 dependency**: substitute a non-avalanche-rated or lower-voltage FET later
-(the rejected IRFZ44N was 55 V…) and the margin quietly shrinks. If a scope
-ever shows drain spikes flirting with 60 V, an RC snubber (~100 Ω + 10 nF
-across each half-winding) is the textbook retrofit.
+(the IRFZ44N on hand is 55 V — see the Rev M note below) and the margin
+quietly shrinks. If a scope ever shows drain spikes flirting with 60 V, an
+RC snubber (~100 Ω + 10 nF across each half-winding) is the textbook retrofit.
 
-**Action:** none now; add a schematic note "Q2/Q3 must be avalanche-rated;
-no snubber fitted."
+**Action:** ✅ **Done (Rev M, 2026-08-01).** The FET actually on hand is the
+IRFZ44N (55 V) — a *lower-voltage* part than the 60 V rule wants, which is
+exactly the "margin quietly shrinks" case above. Rather than lean on the
+avalanche rating of a sub-60 V part, the RC snubber (R16/R17 100 Ω +
+C9/C10 10 nF, one across each half-winding, each Q drain → 5 V tap) is now
+**fitted** on [rotary_dial_circuit_revM.svg](../rotary_dial_circuit_revM.svg).
+The IRFZ44N is itself fully avalanche-rated (E_AS 530 mJ, E_AR 9.4 mJ
+repetitive) as a backstop, so the snubbed 55 V part has ample margin — and
+fitting the snubber also retires the repetitive-avalanche concern from
+[07](07_gemini_review_audit.md).
 
 ---
 

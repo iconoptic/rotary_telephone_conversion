@@ -20,7 +20,7 @@
   AVR has enormous timing margin and avoids ISR/volatile complexity in the
   ATmega32u4's 2.5KB of RAM.
 
-  WIRING (see docs/rotary_dial_circuit_revI.svg):
+  WIRING (see docs/rotary_dial_circuit_revM.svg):
     SHUNT_PIN (D0)  -- White pair (dial off-normal). Has a 14.5kohm internal
                        bleeder resistor in parallel with the contact at
                        rest, so an EXTERNAL 2.2kohm pull-up to 5V is
@@ -48,10 +48,12 @@
     IR_RX     (A0)  -- IR phototransistor collector to 5V, emitter to this
                        pin AND through R11 10kohm to GND (emitter follower
                        load). More IR -> higher voltage.
-    BELL_A    (D2)  -- gate of push-pull MOSFET Q2 (via R12 100ohm, with
-                       R14 10k gate pulldown).
-    BELL_B    (D3)  -- gate of push-pull MOSFET Q3 (via R13 100ohm, with
-                       R15 10k gate pulldown).
+    BELL_A    (D2)  -- gate of push-pull MOSFET Q2 = IRFZ44N (via R12
+                       100ohm, R14 10k gate pulldown). RC snubber R16
+                       100ohm + C9 10nF from Q2 drain to the 5V tap.
+    BELL_B    (D3)  -- gate of push-pull MOSFET Q3 = IRFZ44N (via R13
+                       100ohm, R15 10k gate pulldown). RC snubber R17
+                       100ohm + C10 10nF from Q3 drain to the 5V tap.
 
   BELL DRIVE THEORY: the ringer coils measure 5.97kohm DC, so 5V straight
   across them is 0.84mA -- nowhere near enough to move the clapper (these
@@ -61,6 +63,18 @@
   the mains-side winding feeds the bell. That gives a true bipolar drive
   (needed by a polarised ringer, whose armature must swing both ways) with
   NO high-voltage switching devices.
+
+  Q2/Q3 = IRFZ44N (the N-channel MOSFETs on hand). These are 55V parts and
+  are NOT true logic-level (V_GS(th) up to 4V), but they are fine here: at
+  a 5V gate they pass ~10A vs our ~0.3A load, and their higher R_DS(on)
+  (est. 30-60mohm vs 17.5mohm rated at V_GS=10V) drops <20mV at 0.3A.
+  Because 55V is under the 60V design rule, an RC snubber (R16/R17 100ohm +
+  C9/C10 10nF, one across each half-winding, drain -> 5V tap) is FITTED to
+  clamp the leakage-inductance turn-off spike well below 55V rather than
+  lean on the FET's avalanche rating. The IRFZ44N is also fully avalanche-
+  rated (EAS 530mJ, EAR 9.4mJ repetitive) as a backstop. This is a
+  comments-only change from the STP55NF06L: the FETs switch on the same
+  D2/D3 signals, so no timing/soft-start/watchdog/HID logic changed.
 
   T1 CHOICE (revised 2026-08-01: the part actually on hand is a Hammond
   161G24, SINGLE-primary 115V/60Hz-only -- not the dual-primary 160G24

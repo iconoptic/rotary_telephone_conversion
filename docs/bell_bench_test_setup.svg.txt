@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 980" font-family="monospace" font-size="14">
+  <style>
+    .wire   { stroke:#111; stroke-width:2; fill:none; }
+    .dash   { stroke:#555; stroke-width:1.5; fill:none; stroke-dasharray:5,4; }
+    .lbl    { fill:#111; font-size:13px; }
+    .lbl-b  { fill:#111; font-size:13px; font-weight:bold; }
+    .lbl-sm { fill:#222; font-size:11px; }
+    .ic     { fill:#fff; stroke:#111; stroke-width:2; }
+    .node   { fill:#111; }
+    .res    { fill:#fff; stroke:#111; stroke-width:2; }
+    .cap    { stroke:#111; stroke-width:3; fill:none; }
+    .tp     { fill:#c0392b; stroke:#7a1f1f; stroke-width:1.5; }
+    .tplbl  { fill:#7a1f1f; font-size:12px; font-weight:bold; }
+  </style>
+
+  <rect x="0" y="0" width="1300" height="980" fill="#f3ecda"/>
+  <text x="20" y="28" class="lbl-b" font-size="18">Bell driver bench test setup -- BELL DISCONNECTED, snubber/voltage checks (Rev M)</text>
+  <text x="20" y="48" class="lbl-sm">Every measurement below happens with the bell's RED/BLACK leads physically unplugged from R18/T1 -- T1 runs unloaded (open secondary) for these steps.</text>
+
+  <!-- Q2 -->
+  <rect x="60" y="150" width="90" height="60" class="ic"/>
+  <text x="105" y="174" text-anchor="middle" class="lbl-sm">Q2</text>
+  <text x="105" y="189" text-anchor="middle" class="lbl-sm" fill="#555">N-ch</text>
+  <text x="105" y="204" text-anchor="middle" class="lbl-sm" fill="#a03a3a">IRFZ44N</text>
+  <text x="30" y="182" text-anchor="end" class="lbl-sm">D2 gate</text>
+  <text x="52" y="176" text-anchor="end" class="lbl-sm">G</text>
+  <line x1="10" y1="180" x2="60" y2="180" class="wire"/>
+  <text x="156" y="176" class="lbl-sm">D</text>
+  <text x="112" y="216" class="lbl-sm">S</text>
+  <line x1="105" y1="210" x2="105" y2="218" class="wire"/>
+  <line x1="75" y1="218" x2="105" y2="218" class="wire"/>
+  <text x="20" y="222" class="lbl-sm">GND</text>
+  <circle cx="180" cy="130" r="7" class="tp"/>
+  <text x="196" y="126" class="tplbl">TP-A: Q2 drain</text>
+  <text x="196" y="141" class="lbl-sm">scope +, GND clip near Q2 source</text>
+
+  <!-- Q3 (moved down, more room for the snubber corridor) -->
+  <rect x="60" y="500" width="90" height="60" class="ic"/>
+  <text x="105" y="524" text-anchor="middle" class="lbl-sm">Q3</text>
+  <text x="105" y="539" text-anchor="middle" class="lbl-sm" fill="#555">N-ch</text>
+  <text x="105" y="554" text-anchor="middle" class="lbl-sm" fill="#a03a3a">IRFZ44N</text>
+  <text x="30" y="532" text-anchor="end" class="lbl-sm">D3 gate</text>
+  <text x="52" y="527" text-anchor="end" class="lbl-sm">G</text>
+  <line x1="10" y1="530" x2="60" y2="530" class="wire"/>
+  <text x="156" y="527" class="lbl-sm">D</text>
+  <text x="112" y="497" class="lbl-sm">S</text>
+  <line x1="105" y1="500" x2="105" y2="492" class="wire"/>
+  <line x1="75" y1="492" x2="105" y2="492" class="wire"/>
+  <text x="20" y="496" class="lbl-sm">GND</text>
+  <circle cx="180" cy="580" r="7" class="tp"/>
+  <text x="196" y="596" class="tplbl">TP-C: Q3 drain</text>
+  <text x="196" y="611" class="lbl-sm">scope + here (2nd channel, or repeat the TP-A test)</text>
+
+  <!-- drain nodes -->
+  <line x1="150" y1="180" x2="230" y2="180" class="wire"/>
+  <circle cx="180" cy="180" r="4" class="node"/>
+  <line x1="150" y1="530" x2="230" y2="530" class="wire"/>
+  <circle cx="180" cy="530" r="4" class="node"/>
+
+  <!-- Q2 snubber: R16+C9, drain(180,180) down to shared 5V tap at y=355 -->
+  <line x1="180" y1="180" x2="180" y2="220" class="wire"/>
+  <rect x="172" y="220" width="16" height="40" class="res"/>
+  <text x="196" y="235" class="lbl-sm" fill="#a03a3a">R16</text>
+  <text x="196" y="249" class="lbl-sm" fill="#a03a3a">100&#8486;</text>
+  <line x1="180" y1="260" x2="180" y2="278" class="wire"/>
+  <line x1="170" y1="278" x2="190" y2="278" class="cap"/>
+  <line x1="170" y1="286" x2="190" y2="286" class="cap"/>
+  <text x="196" y="286" class="lbl-sm" fill="#a03a3a">C9 10nF</text>
+  <line x1="180" y1="286" x2="180" y2="355" class="wire"/>
+
+  <!-- Q3 snubber: R17+C10, drain(180,530) up to the same shared 5V tap -->
+  <line x1="180" y1="530" x2="180" y2="470" class="wire"/>
+  <rect x="172" y="430" width="16" height="40" class="res"/>
+  <text x="196" y="445" class="lbl-sm" fill="#a03a3a">R17</text>
+  <text x="196" y="459" class="lbl-sm" fill="#a03a3a">100&#8486;</text>
+  <line x1="180" y1="430" x2="180" y2="412" class="wire"/>
+  <line x1="170" y1="412" x2="190" y2="412" class="cap"/>
+  <line x1="170" y1="404" x2="190" y2="404" class="cap"/>
+  <text x="196" y="410" class="lbl-sm" fill="#a03a3a">C10 10nF</text>
+  <line x1="180" y1="404" x2="180" y2="355" class="wire"/>
+
+  <line x1="180" y1="355" x2="260" y2="355" class="wire"/>
+  <circle cx="180" cy="355" r="4" class="node"/>
+  <text x="266" y="351" class="lbl-sm">5V tap</text>
+  <text x="266" y="365" class="lbl-sm">(C7/C8 bulk caps)</text>
+
+  <!-- T1 -->
+  <text x="470" y="150" class="lbl-b">T1 (161G24)</text>
+  <path d="M420,180 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20" class="wire"/>
+  <text x="400" y="176" text-anchor="end" class="lbl-sm" fill="#555">pin 3</text>
+  <line x1="420" y1="320" x2="420" y2="390" class="wire"/>
+  <path d="M420,390 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20 a10,10 0 0 0 0,20" class="wire"/>
+  <text x="400" y="526" text-anchor="end" class="lbl-sm" fill="#555">pin 6</text>
+  <line x1="420" y1="180" x2="230" y2="180" class="wire"/>
+  <line x1="420" y1="530" x2="230" y2="530" class="wire"/>
+  <line x1="440" y1="355" x2="420" y2="355" class="wire"/>
+  <text x="446" y="340" class="lbl-sm">centre tap (5V)</text>
+  <line x1="460" y1="200" x2="460" y2="510" class="wire"/>
+  <line x1="468" y1="200" x2="468" y2="510" class="wire"/>
+  <path d="M510,220 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20 a10,10 0 0 1 0,20" class="wire"/>
+  <text x="536" y="400" class="lbl-sm">HV: single 115V winding</text>
+  <text x="515" y="216" class="lbl-sm" fill="#555">pin 1</text>
+  <text x="515" y="484" class="lbl-sm" fill="#555">pin 2</text>
+
+  <!-- Secondary to R18 to disconnected bell terminals, DMM across the gap -->
+  <line x1="510" y1="220" x2="600" y2="220" class="wire"/>
+  <rect x="600" y="212" width="60" height="16" class="res"/>
+  <text x="600" y="202" class="lbl-sm">R18 220&#8486;</text>
+  <line x1="660" y1="220" x2="693" y2="220" class="wire"/>
+  <text x="715" y="224" class="lbl-sm" fill="#a03a3a">RED (open)</text>
+
+  <line x1="510" y1="490" x2="693" y2="490" class="wire"/>
+  <text x="715" y="494" class="lbl-sm" fill="#a03a3a">BLACK (open)</text>
+
+  <!-- gap markers showing disconnected bell -->
+  <line x1="693" y1="212" x2="693" y2="228" stroke="#a03a3a" stroke-width="3"/>
+  <line x1="693" y1="482" x2="693" y2="498" stroke="#a03a3a" stroke-width="3"/>
+  <text x="620" y="530" class="lbl-sm" fill="#a03a3a">bell RED/BLACK leads UNPLUGGED for this whole test -- T1 secondary runs open/unloaded</text>
+
+  <!-- DMM across the R18/bell-disconnect gap -->
+  <circle cx="850" cy="220" r="7" class="tp"/>
+  <text x="865" y="200" class="tplbl">TP-B: R18-&gt;RED vs BLACK</text>
+  <line x1="785" y1="220" x2="850" y2="220" class="dash"/>
+  <line x1="785" y1="490" x2="850" y2="490" class="dash"/>
+  <rect x="820" y="330" width="90" height="60" class="ic"/>
+  <text x="865" y="355" text-anchor="middle" class="lbl-sm">DMM</text>
+  <text x="865" y="371" text-anchor="middle" class="lbl-sm" fill="#555">AC volts</text>
+  <line x1="850" y1="220" x2="850" y2="330" class="wire"/>
+  <line x1="850" y1="390" x2="850" y2="490" class="wire"/>
+
+  <!-- Legend / step box -->
+  <rect x="20" y="700" width="1260" height="270" fill="#eaf3ea" stroke="#3a8a3a" stroke-width="1.5"/>
+  <text x="32" y="722" class="lbl-b" fill="#1e5c1e">Step order (bell stays disconnected the whole time)</text>
+  <text x="32" y="744" class="lbl-sm" fill="#1e5c1e">1. POWER OFF. DMM continuity/resistance: T1 pins R(3-6) &#8776; 2x R(3-4) (161G24 sanity check); R16/C9 and R17/C10 legs not open, not dead-shorted; Q2/Q3 not D-S shorted (diode mode).</text>
+  <text x="32" y="762" class="lbl-sm" fill="#1e5c1e">2. Confirm bell RED/BLACK are physically unplugged (red gap tick marks above, TP-B open). This protects the bell coil and clapper mechanism during first power-up.</text>
+  <text x="32" y="780" class="lbl-sm" fill="#1e5c1e">3. Power the ItsyBitsy over USB. Open the serial monitor at 115200 baud (bell_ir_test.ino), do NOT open at 1200 baud.</text>
+  <text x="32" y="798" class="lbl-sm" fill="#1e5c1e">4. Send 'h' (hold/continuous ring) so the driver runs steadily instead of a 2s burst -- easier to catch a stable reading on a DMM, which is slow to settle.</text>
+  <text x="32" y="816" class="lbl-sm" fill="#1e5c1e">5. TP-B, DMM in AC VOLTS (auto-range): expect roughly 48Vac across RED vs BLACK (161G24 unloaded, Rev L/M). This confirms T1 and its wiring/turns ratio, independent of the FETs.</text>
+  <text x="32" y="834" class="lbl-sm" fill="#1e5c1e">6. TP-A / TP-C, scope only (a DMM cannot see this): probe a drain vs GND. Expect ~0V while on, a ~10V flat top while off, and a brief spike riding on that flat top.</text>
+  <text x="32" y="852" class="lbl-sm" fill="#1e5c1e">   PASS = spike stays clearly under 55V (the IRFZ44N's rated V_DSS). If it's flirting with 55V, STOP and re-check the snubber wiring/values before going further.</text>
+  <text x="32" y="870" class="lbl-sm" fill="#a03a3a">NO SCOPE ON HAND? A DMM cannot catch a microsecond-scale spike -- it only reads the (much lower) average/RMS. You are then trusting the calculated margin</text>
+  <text x="32" y="888" class="lbl-sm" fill="#a03a3a">(snubber + IRFZ44N avalanche rating, see docs/revK_design_review/03_bell_failure_modes.md), not a direct measurement. Two cheap ways to hedge without a scope:</text>
+  <text x="32" y="906" class="lbl-sm" fill="#a03a3a">  a) run step 4 for only a few seconds at first, feeling Q2/Q3 for warmth right after (excess heat = a clue) before running it continuously;</text>
+  <text x="32" y="924" class="lbl-sm" fill="#a03a3a">  b) borrow a scope for just this one check -- it is the single measurement in this whole design that a DMM structurally cannot make.</text>
+  <text x="32" y="942" class="lbl-sm" fill="#1e5c1e">7. Send 's' to stop. DMM in DC volts on the 5V rail near T1's centre tap while ringing (step 4 again) -- confirm it doesn't sag close to the AVR's ~4.5V brownout floor.</text>
+  <text x="32" y="960" class="lbl-sm" fill="#1e5c1e">8. Only once 5/6/7 look right: power off, reconnect bell RED/BLACK, power on, 'r' for one real ring, listen/feel the clapper. 9. Insulate exposed HV wiring -- ~48V real shock.</text>
+</svg>
