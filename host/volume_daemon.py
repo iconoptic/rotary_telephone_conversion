@@ -5,9 +5,9 @@ Host-side companion for the vintage rotary phone USB volume control.
 The firmware's vendor-defined HID usage page (0xFF00) is not the standard
 Consumer Control page, so the OS never treats it as a media key -- it just
 shows up as a plain HID device. This script finds that device, reads its
-reports (byte 0 = HID Report ID, always 0x01; byte 1 = target volume
-percent 0-100), and applies the exact value to the system volume.
-Deterministic, no drift, no auto-mute side effects.
+single-byte reports (target volume percent 0-100), and applies the exact
+value to the system volume. Deterministic, no drift, no auto-mute side
+effects.
 
 Supports Linux and Windows 11:
 
@@ -29,29 +29,29 @@ Usage:
 
 Linux permission errors: if you get "Permission denied" opening
 /dev/hidrawN, add a udev rule granting your user (or the `input` group)
-access to hidraw devices from this board (VID 239a / PID 800e -- Adafruit
-ItsyBitsy 32u4 5V 16MHz), then replug the board.
+access to hidraw devices from this board (VID 2e8a / PID 0005 -- Raspberry
+Pi Pico), then replug the board.
 
-Rev I (2026-07-27): MCU migrated from a Raspberry Pi Pico (VID 2e8a / PID
-0005) to an Adafruit ItsyBitsy 32u4 (VID 239a / PID 800e). Arduino's HID.h
-requires a Report ID on custom report descriptors, so reports are now 2
-bytes (report ID + percent) instead of 1.
+Rev N (2026-08-02): MCU migrated back from the Adafruit ItsyBitsy 32u4
+(which failed during bell-driver bring-up) to a Raspberry Pi Pico
+(MicroPython). Reverted to the Pico's native 1-byte report (no Report ID --
+that was only ever an Arduino HID.h/PluggableUSB requirement) and VID:PID
+back to 2e8a:0005.
 
-Windows 11 support added same revision: platform-specific device I/O and
-volume-control backends, selected automatically at runtime via
-sys.platform. The wire protocol (VID/PID, vendor usage page 0xFF00/usage
-0x01, 2-byte report) is identical on both platforms -- only how the host
-opens the device and how it applies the volume differs.
+Windows 11 support: platform-specific device I/O and volume-control
+backends, selected automatically at runtime via sys.platform. The wire
+protocol (VID/PID, vendor usage page 0xFF00/usage 0x01, 1-byte report) is
+identical on both platforms -- only how the host opens the device and how
+it applies the volume differs.
 """
 
 import sys
 
-VID = "239a"
-PID = "800e"
-REPORT_ID = 0x01
+VID = "2e8a"
+PID = "0005"
 
-VID_INT = 0x239A
-PID_INT = 0x800E
+VID_INT = 0x2E8A
+PID_INT = 0x0005
 USAGE_PAGE = 0xFF00
 USAGE = 0x01
 
@@ -97,8 +97,8 @@ def _run_linux():
     while True:
         dev_path = _linux_find_hidraw_device()
         if not dev_path:
-            print("Could not find the ItsyBitsy's hidraw device (VID {}:{}). "
-                  "Is it plugged in and running rotary_volume.ino? Retrying in 2s...".format(VID, PID),
+            print("Could not find the Pico's hidraw device (VID {}:{}). "
+                  "Is it plugged in and running main.py? Retrying in 2s...".format(VID, PID),
                   file=sys.stderr)
             try:
                 time.sleep(2)
@@ -111,12 +111,10 @@ def _run_linux():
         try:
             with open(dev_path, "rb", buffering=0) as f:
                 while True:
-                    data = f.read(2)
-                    if not data or len(data) < 2:
+                    data = f.read(1)
+                    if not data:
                         continue
-                    if data[0] != REPORT_ID:
-                        continue
-                    percent = data[1]
+                    percent = data[0]
                     _linux_set_volume_percent(percent)
         except PermissionError:
             print("Permission denied opening {}. See the docstring at the top of "
@@ -185,8 +183,8 @@ def _run_windows():
     while True:
         device_path = _windows_find_device_path()
         if not device_path:
-            print("Could not find the ItsyBitsy's HID device (VID {}:{}, usage page "
-                  "0x{:04X}). Is it plugged in and running rotary_volume.ino? "
+            print("Could not find the Pico's HID device (VID {}:{}, usage page "
+                  "0x{:04X}). Is it plugged in and running main.py? "
                   "Retrying in 2s...".format(VID, PID, USAGE_PAGE), file=sys.stderr)
             try:
                 time.sleep(2)
@@ -211,12 +209,10 @@ def _run_windows():
         try:
             h.set_nonblocking(False)
             while True:
-                data = h.read(2)
-                if not data or len(data) < 2:
+                data = h.read(1)
+                if not data:
                     continue
-                if data[0] != REPORT_ID:
-                    continue
-                percent = data[1]
+                percent = data[0]
                 volume.SetMasterVolumeLevelScalar(percent / 100.0, None)
                 print("Set system volume to {}%".format(percent))
         except OSError as e:

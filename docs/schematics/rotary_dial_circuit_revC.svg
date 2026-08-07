@@ -1,0 +1,206 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 940" font-family="monospace" font-size="14">
+  <style>
+    .wire   { stroke:#111; stroke-width:2; fill:none; }
+    .dash   { stroke:#666; stroke-width:1.5; fill:none; stroke-dasharray:5,4; }
+    .lbl    { fill:#111; font-size:13px; }
+    .lbl-b  { fill:#111; font-size:13px; font-weight:bold; }
+    .lbl-sm { fill:#333; font-size:11px; }
+    .ic     { fill:#f5f0e6; stroke:#111; stroke-width:2; }
+    .node   { fill:#111; }
+    .res    { fill:#fff; stroke:#111; stroke-width:2; }
+  </style>
+
+  <text x="20" y="28" class="lbl-b" font-size="19">Rotary Dial &#8594; Pico (RP2040) &#8212; Rev C (adds binary digit readout LEDs)</text>
+  <text x="20" y="48" class="lbl-sm">WHITE = shunt/off-normal (ext. 2.2k pull-up required). BLUE = pulse (int. pull-up OK). New: 4 LEDs latch the last decoded digit in binary.</text>
+
+  <!-- ======================= PICO BODY ======================= -->
+  <rect x="700" y="150" width="240" height="470" rx="6" class="ic"/>
+  <text x="820" y="140" text-anchor="middle" class="lbl-b">Raspberry Pi Pico (RP2040)</text>
+
+  <!-- Pin stubs, left edge -->
+  <circle cx="700" cy="180" r="3" class="node"/>
+  <text x="710" y="176" class="lbl-sm">3V3(OUT)  phys 36</text>
+  <circle cx="700" cy="260" r="3" class="node"/>
+  <text x="710" y="256" class="lbl-sm">GP2  phys 4  (SHUNT_IN, no internal pull)</text>
+  <circle cx="700" cy="340" r="3" class="node"/>
+  <text x="710" y="336" class="lbl-sm">GP3  phys 5  (PULSE_IN, Pin.PULL_UP)</text>
+  <circle cx="700" cy="580" r="3" class="node"/>
+  <text x="710" y="576" class="lbl-sm">GND  phys 38</text>
+
+  <!-- Pin stubs, right edge: LED_SHUNT / LED_PULSE -->
+  <circle cx="940" cy="430" r="3" class="node"/>
+  <text x="930" y="426" text-anchor="end" class="lbl-sm">GP14  phys 19</text>
+  <circle cx="940" cy="500" r="3" class="node"/>
+  <text x="930" y="496" text-anchor="end" class="lbl-sm">GP15  phys 20</text>
+
+  <!-- Pin stubs, bottom edge: 4-bit digit readout -->
+  <circle cx="740" cy="620" r="3" class="node"/>
+  <text x="740" y="638" text-anchor="middle" class="lbl-sm">GP16</text>
+  <text x="740" y="650" text-anchor="middle" class="lbl-sm">phys21</text>
+  <circle cx="800" cy="620" r="3" class="node"/>
+  <text x="800" y="638" text-anchor="middle" class="lbl-sm">GP17</text>
+  <text x="800" y="650" text-anchor="middle" class="lbl-sm">phys22</text>
+  <circle cx="860" cy="620" r="3" class="node"/>
+  <text x="860" y="638" text-anchor="middle" class="lbl-sm">GP18</text>
+  <text x="860" y="650" text-anchor="middle" class="lbl-sm">phys24</text>
+  <circle cx="920" cy="620" r="3" class="node"/>
+  <text x="920" y="638" text-anchor="middle" class="lbl-sm">GP19</text>
+  <text x="920" y="650" text-anchor="middle" class="lbl-sm">phys25</text>
+
+  <!-- Internal pull-up on GP3 (dashed, inside Pico) -->
+  <line x1="700" y1="340" x2="760" y2="340" class="dash"/>
+  <line x1="760" y1="340" x2="760" y2="310" class="dash"/>
+  <rect x="752" y="260" width="16" height="50" fill="none" stroke="#666" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="760" y1="260" x2="760" y2="235" class="dash"/>
+  <text x="772" y="290" class="lbl-sm" fill="#666">R_pu(int)</text>
+  <text x="772" y="304" class="lbl-sm" fill="#666">50&#8211;80k&#8486;</text>
+  <text x="772" y="232" class="lbl-sm" fill="#666">3V3 (internal)</text>
+
+  <!-- ======================= 3V3 RAIL ======================= -->
+  <line x1="700" y1="180" x2="120" y2="180" class="wire"/>
+  <text x="70" y="184" class="lbl-b">3V3</text>
+
+  <!-- ======================= GND RAIL ======================= -->
+  <line x1="120" y1="700" x2="1160" y2="700" class="wire" stroke-width="3"/>
+  <line x1="620" y1="700" x2="620" y2="722" class="wire"/>
+  <line x1="604" y1="722" x2="636" y2="722" class="wire"/>
+  <line x1="610" y1="730" x2="630" y2="730" class="wire"/>
+  <line x1="616" y1="738" x2="624" y2="738" class="wire"/>
+  <text x="645" y="726" class="lbl-sm">GND</text>
+  <line x1="700" y1="580" x2="670" y2="580" class="wire"/>
+  <line x1="670" y1="580" x2="670" y2="700" class="wire"/>
+
+  <!-- ======================= WHITE / SHUNT CHANNEL ======================= -->
+  <line x1="180" y1="180" x2="180" y2="205" class="wire"/>
+  <rect x="172" y="205" width="16" height="50" class="res"/>
+  <text x="196" y="225" class="lbl">R3</text>
+  <text x="196" y="241" class="lbl">2.2k&#8486;</text>
+  <line x1="180" y1="255" x2="180" y2="290" class="wire"/>
+  <circle cx="180" cy="290" r="4" class="node"/>
+  <text x="150" y="284" class="lbl-b">N1</text>
+  <line x1="180" y1="290" x2="640" y2="290" class="wire"/>
+  <line x1="640" y1="290" x2="640" y2="260" class="wire"/>
+  <line x1="640" y1="260" x2="700" y2="260" class="wire"/>
+  <rect x="110" y="330" width="230" height="310" fill="none" stroke="#8a6d3b" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="118" y="348" class="lbl-sm" fill="#8a6d3b">inside dial &#8212; WHITE pair</text>
+  <line x1="180" y1="290" x2="180" y2="380" class="wire"/>
+  <circle cx="180" cy="380" r="3" class="node"/>
+  <line x1="180" y1="380" x2="208" y2="440" class="wire"/>
+  <circle cx="180" cy="450" r="3" class="node"/>
+  <line x1="180" y1="450" x2="180" y2="700" class="wire"/>
+  <text x="120" y="420" class="lbl-b">S1</text>
+  <text x="120" y="436" class="lbl-sm">shunt /</text>
+  <text x="120" y="450" class="lbl-sm">off-normal</text>
+  <text x="120" y="464" class="lbl-sm">(N.O. at rest)</text>
+  <line x1="290" y1="290" x2="290" y2="360" class="wire"/>
+  <line x1="180" y1="290" x2="290" y2="290" class="wire"/>
+  <rect x="282" y="360" width="16" height="50" class="res"/>
+  <text x="304" y="380" class="lbl">R_int</text>
+  <text x="304" y="396" class="lbl">14.5k&#8486;</text>
+  <line x1="290" y1="410" x2="290" y2="620" class="wire"/>
+  <line x1="290" y1="620" x2="180" y2="620" class="wire"/>
+  <circle cx="180" cy="620" r="4" class="node"/>
+  <circle cx="180" cy="290" r="4" class="node"/>
+  <text x="304" y="430" class="lbl-sm">(measured: bleeder /</text>
+  <text x="304" y="444" class="lbl-sm">spark-quench resistor)</text>
+
+  <!-- ======================= BLUE / PULSE CHANNEL ======================= -->
+  <line x1="700" y1="340" x2="470" y2="340" class="wire"/>
+  <circle cx="470" cy="340" r="4" class="node"/>
+  <text x="480" y="334" class="lbl-b">N2</text>
+  <rect x="410" y="360" width="180" height="280" fill="none" stroke="#31708f" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="418" y="378" class="lbl-sm" fill="#31708f">inside dial &#8212; BLUE pair</text>
+  <line x1="470" y1="340" x2="470" y2="410" class="wire"/>
+  <circle cx="470" cy="410" r="3" class="node"/>
+  <line x1="470" y1="410" x2="486" y2="478" class="wire"/>
+  <circle cx="470" cy="480" r="3" class="node"/>
+  <line x1="470" y1="480" x2="470" y2="700" class="wire"/>
+  <text x="500" y="440" class="lbl-b">S2</text>
+  <text x="500" y="456" class="lbl-sm">pulse contact</text>
+  <text x="500" y="470" class="lbl-sm">(N.C. at rest;</text>
+  <text x="500" y="484" class="lbl-sm">opens ~10Hz on</text>
+  <text x="500" y="498" class="lbl-sm">spring return)</text>
+
+  <!-- ======================= LED CHANNELS: SHUNT / PULSE (right) ======================= -->
+  <line x1="940" y1="430" x2="985" y2="430" class="wire"/>
+  <rect x="985" y="422" width="50" height="16" class="res"/>
+  <text x="988" y="416" class="lbl-sm">R1 330&#8486;</text>
+  <line x1="1035" y1="430" x2="1070" y2="430" class="wire"/>
+  <polygon points="1070,420 1070,440 1098,430" fill="#fff" stroke="#111" stroke-width="2"/>
+  <line x1="1098" y1="420" x2="1098" y2="440" class="wire"/>
+  <line x1="1080" y1="412" x2="1088" y2="402" class="wire"/>
+  <line x1="1088" y1="402" x2="1092" y2="407" class="wire"/>
+  <line x1="1071" y1="410" x2="1079" y2="400" class="wire"/>
+  <line x1="1079" y1="400" x2="1083" y2="405" class="wire"/>
+  <text x="1058" y="458" class="lbl-sm">LED1 &#8220;SHUNT&#8221;</text>
+  <text x="1058" y="470" class="lbl-sm">(lit = dial off-normal)</text>
+  <line x1="1098" y1="430" x2="1130" y2="430" class="wire"/>
+  <line x1="1130" y1="430" x2="1130" y2="700" class="wire"/>
+
+  <line x1="940" y1="500" x2="985" y2="500" class="wire"/>
+  <rect x="985" y="492" width="50" height="16" class="res"/>
+  <text x="988" y="486" class="lbl-sm">R2 330&#8486;</text>
+  <line x1="1035" y1="500" x2="1070" y2="500" class="wire"/>
+  <polygon points="1070,490 1070,510 1098,500" fill="#fff" stroke="#111" stroke-width="2"/>
+  <line x1="1098" y1="490" x2="1098" y2="510" class="wire"/>
+  <line x1="1080" y1="482" x2="1088" y2="472" class="wire"/>
+  <line x1="1088" y1="472" x2="1092" y2="477" class="wire"/>
+  <line x1="1071" y1="480" x2="1079" y2="470" class="wire"/>
+  <line x1="1079" y1="470" x2="1083" y2="475" class="wire"/>
+  <text x="1058" y="528" class="lbl-sm">LED2 &#8220;PULSE&#8221;</text>
+  <text x="1058" y="540" class="lbl-sm">(blinks 10Hz &#8212; the</text>
+  <text x="1058" y="552" class="lbl-sm">square wave itself)</text>
+  <line x1="1098" y1="500" x2="1160" y2="500" class="wire"/>
+  <line x1="1160" y1="500" x2="1160" y2="700" class="wire"/>
+
+  <!-- ======================= DIGIT READOUT LEDs (bottom, binary bit0..bit3) ======================= -->
+  <g>
+    <!-- bit0 GP16 -->
+    <line x1="740" y1="620" x2="740" y2="645" class="wire"/>
+    <rect x="732" y="645" width="16" height="45" class="res"/>
+    <text x="700" y="668" class="lbl-sm">bit0=1</text>
+    <line x1="740" y1="690" x2="740" y2="715" class="wire"/>
+    <polygon points="730,715 750,715 740,735" fill="#fff" stroke="#111" stroke-width="2"/>
+    <line x1="730" y1="735" x2="750" y2="735" class="wire"/>
+    <line x1="740" y1="735" x2="740" y2="760" class="wire"/>
+
+    <!-- bit1 GP17 -->
+    <line x1="800" y1="620" x2="800" y2="645" class="wire"/>
+    <rect x="792" y="645" width="16" height="45" class="res"/>
+    <text x="760" y="668" class="lbl-sm">bit1=2</text>
+    <line x1="800" y1="690" x2="800" y2="715" class="wire"/>
+    <polygon points="790,715 810,715 800,735" fill="#fff" stroke="#111" stroke-width="2"/>
+    <line x1="790" y1="735" x2="810" y2="735" class="wire"/>
+    <line x1="800" y1="735" x2="800" y2="760" class="wire"/>
+
+    <!-- bit2 GP18 -->
+    <line x1="860" y1="620" x2="860" y2="645" class="wire"/>
+    <rect x="852" y="645" width="16" height="45" class="res"/>
+    <text x="820" y="668" class="lbl-sm">bit2=4</text>
+    <line x1="860" y1="690" x2="860" y2="715" class="wire"/>
+    <polygon points="850,715 870,715 860,735" fill="#fff" stroke="#111" stroke-width="2"/>
+    <line x1="850" y1="735" x2="870" y2="735" class="wire"/>
+    <line x1="860" y1="735" x2="860" y2="760" class="wire"/>
+
+    <!-- bit3 GP19 -->
+    <line x1="920" y1="620" x2="920" y2="645" class="wire"/>
+    <rect x="912" y="645" width="16" height="45" class="res"/>
+    <text x="880" y="668" class="lbl-sm">bit3=8</text>
+    <line x1="920" y1="690" x2="920" y2="715" class="wire"/>
+    <polygon points="910,715 930,715 920,735" fill="#fff" stroke="#111" stroke-width="2"/>
+    <line x1="910" y1="735" x2="930" y2="735" class="wire"/>
+    <line x1="920" y1="735" x2="920" y2="760" class="wire"/>
+  </g>
+  <line x1="740" y1="760" x2="920" y2="760" class="wire"/>
+  <line x1="830" y1="760" x2="830" y2="700" class="wire"/>
+  <text x="740" y="778" class="lbl-b">LED3&#8211;6 &#8220;DIGIT&#8221; (binary, 0000&#8211;1001, latched until next dial pull)</text>
+
+  <!-- ======================= ANALYSIS BOX ======================= -->
+  <rect x="20" y="800" width="1200" height="120" fill="#eef4ff" stroke="#3a6ea5" stroke-width="1.5"/>
+  <text x="32" y="820" class="lbl-b" fill="#1c3f66">Design notes</text>
+  <text x="32" y="838" class="lbl-sm" fill="#1c3f66">R3 = 2.2k&#8486; on the White/shunt line is REQUIRED: it overrides the dial's internal 14.5k&#8486; bleeder so GP2 sees a clean HIGH at rest (2.86V) vs LOW when moved (0V).</text>
+  <text x="32" y="856" class="lbl-sm" fill="#1c3f66">LED2 "PULSE" already lets you see the raw ~10Hz square wave with the naked eye (human flicker-fusion is ~60-90Hz, so 10Hz reads as clean blinking, not a blur) -- no scope needed.</text>
+  <text x="32" y="874" class="lbl-sm" fill="#1c3f66">LEDs 3-6 give a second, independent confirmation channel: they latch the DECODED digit in binary and hold it until the next dial pull, so you can visually cross-check against the REPL log.</text>
+  <text x="32" y="892" class="lbl-sm" fill="#1c3f66">Binary reading: bit3 bit2 bit1 bit0 (MSB first). E.g. digit 5 = 0101 = bit2+bit0 lit. Digit 0 = 0000 = all four off.</text>
+  <text x="32" y="910" class="lbl-sm" fill="#1c3f66">All 6 LEDs use 330&#8486; series resistors (&#8776;3.9mA each, well under RP2040's 4mA default / 12mA max GPIO pad drive strength).</text>
+</svg>

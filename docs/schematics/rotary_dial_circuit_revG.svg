@@ -1,0 +1,384 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1750 1700" font-family="monospace" font-size="14">
+  <style>
+    .wire   { stroke:#111; stroke-width:2; fill:none; }
+    .dash   { stroke:#555; stroke-width:1.5; fill:none; stroke-dasharray:5,4; }
+    .lbl    { fill:#111; font-size:13px; }
+    .lbl-b  { fill:#111; font-size:13px; font-weight:bold; }
+    .lbl-sm { fill:#222; font-size:11px; }
+    .ic     { fill:#fff; stroke:#111; stroke-width:2; }
+    .node   { fill:#111; }
+    .res    { fill:#fff; stroke:#111; stroke-width:2; }
+    .cap    { stroke:#111; stroke-width:3; fill:none; }
+  </style>
+
+  <!-- ======================= BACKGROUND ======================= -->
+  <rect x="0" y="0" width="1750" height="1700" fill="#f3ecda"/>
+
+  <text x="20" y="28" class="lbl-b" font-size="19">Rotary Phone &#8594; Pico (RP2040) &#8212; Rev G (replaces GP10 PWM/transistor receiver driver with a MAX98357A I2S DAC+amp module, 2026-07-26)</text>
+  <text x="20" y="50" class="lbl-sm">Dial fully isolated from phone network. WHITE = shunt/off-normal (N1), BLUE = pulse (N2), GREEN/WHITE = switchhook lever (N3), RED/BLACK = carbon mic (N4), WHITE/GREEN = receiver (N5).</text>
+  <text x="20" y="70" class="lbl-sm">Every dashed box below is a component that physically lives inside the phone (handset or dial); everything outside the dashed boxes is the discrete circuit you are building on/around the Pico.</text>
+  <text x="20" y="90" class="lbl-sm">Phase 0 DMM result: mic resistance ~0.5&#8211;2k&#8486; baseline, drifting with ambient sound, spiking 5k&#8486;+ on shock &#8212; confirms carbon mic. Receiver (earpiece) ~50&#8211;300&#8486; electromagnetic coil.</text>
+  <text x="20" y="110" class="lbl-sm" fill="#1e5c1e">Rev G rationale: revF's bare-transistor PWM driver had no gain stage (Q1 only switches the rail through the coil) -- max output was a few mW, audibly "barely there" even at full duty swing. MAX98357A is a real Class-D amp with true gain, driven over I2S (hardware DMA, no MicroPython real-time bottleneck).</text>
+
+  <!-- ======================= PICO BODY ======================= -->
+  <rect x="850" y="170" width="260" height="680" rx="6" class="ic"/>
+  <text x="980" y="158" text-anchor="middle" class="lbl-b">Raspberry Pi Pico (RP2040)</text>
+
+  <!-- Pin stubs, left edge -->
+  <circle cx="850" cy="220" r="3" class="node"/>
+  <text x="858" y="216" class="lbl-sm">3V3(OUT) phys36</text>
+  <circle cx="850" cy="340" r="3" class="node"/>
+  <text x="858" y="336" class="lbl-sm">GP2 phys4 SHUNT_IN</text>
+  <circle cx="850" cy="460" r="3" class="node"/>
+  <text x="858" y="456" class="lbl-sm">GP3 phys5 PULSE_IN</text>
+  <circle cx="850" cy="580" r="3" class="node"/>
+  <text x="858" y="576" class="lbl-sm">GP4 phys6 HOOK_IN</text>
+  <circle cx="850" cy="700" r="3" class="node"/>
+  <text x="858" y="696" class="lbl-sm">GP26 phys31 MIC_ADC0</text>
+  <circle cx="850" cy="800" r="3" class="node"/>
+  <text x="858" y="796" class="lbl-sm">GND phys38</text>
+  <text x="858" y="830" class="lbl-sm" fill="#555">Pin.PULL_UP enabled in software (GP3, GP4 only)</text>
+
+  <!-- Pin stubs, right edge -->
+  <circle cx="1110" cy="340" r="3" class="node"/>
+  <text x="1000" y="326" text-anchor="end" class="lbl-sm">GP14 phys19</text>
+  <circle cx="1110" cy="460" r="3" class="node"/>
+  <text x="1000" y="446" text-anchor="end" class="lbl-sm">GP15 phys20</text>
+
+  <!-- New Rev G I2S + power stubs, tucked into the clear gap above GP14
+       (y=230-311, well clear of both the 3V3(OUT) label at y=216 and the
+       GP14 row at y=340) so their labels don't collide with anything. -->
+  <circle cx="1110" cy="245" r="3" class="node"/>
+  <text x="1000" y="231" text-anchor="end" class="lbl-sm">GP16 phys21 I2S_BCLK</text>
+  <circle cx="1110" cy="267" r="3" class="node"/>
+  <text x="1000" y="253" text-anchor="end" class="lbl-sm">GP17 phys22 I2S_LRC</text>
+  <circle cx="1110" cy="289" r="3" class="node"/>
+  <text x="1000" y="275" text-anchor="end" class="lbl-sm">GP18 phys24 I2S_DIN</text>
+  <circle cx="1110" cy="311" r="3" class="node"/>
+  <text x="1000" y="297" text-anchor="end" class="lbl-sm">VBUS phys40 (5V, amp power)</text>
+
+  <!-- Internal pull-ups on GP3 / GP4 (dashed, inside Pico) -->
+  <line x1="910" y1="195" x2="990" y2="195" class="dash"/>
+  <text x="915" y="188" class="lbl-sm" fill="#555">3V3 (internal)</text>
+  <line x1="850" y1="460" x2="910" y2="460" class="dash"/>
+  <line x1="910" y1="460" x2="910" y2="425" class="dash"/>
+  <rect x="902" y="375" width="16" height="50" fill="none" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="910" y1="375" x2="910" y2="195" class="dash"/>
+  <text x="922" y="392" class="lbl-sm" fill="#555">R_pu(int)</text>
+  <text x="922" y="406" class="lbl-sm" fill="#555">50&#8211;80k&#8486;</text>
+  <line x1="850" y1="580" x2="990" y2="580" class="dash"/>
+  <line x1="990" y1="580" x2="990" y2="545" class="dash"/>
+  <rect x="982" y="495" width="16" height="50" fill="none" stroke="#555" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <line x1="990" y1="495" x2="990" y2="195" class="dash"/>
+  <text x="1002" y="512" class="lbl-sm" fill="#555">R_pu(int)</text>
+  <text x="1002" y="526" class="lbl-sm" fill="#555">50&#8211;80k&#8486;</text>
+
+  <!-- ======================= 3V3 RAIL ======================= -->
+  <line x1="850" y1="220" x2="40" y2="220" class="wire"/>
+  <text x="12" y="214" class="lbl-b">3V3</text>
+
+  <!-- ======================= GND RAIL (with a gap at x=790-810 for the GP26 wire to cross without connecting) ======================= -->
+  <line x1="15" y1="1080" x2="790" y2="1080" class="wire" stroke-width="3"/>
+  <line x1="810" y1="1080" x2="1580" y2="1080" class="wire" stroke-width="3"/>
+  <line x1="680" y1="1080" x2="680" y2="1102" class="wire"/>
+  <line x1="664" y1="1102" x2="696" y2="1102" class="wire"/>
+  <line x1="670" y1="1110" x2="690" y2="1110" class="wire"/>
+  <line x1="676" y1="1118" x2="684" y2="1118" class="wire"/>
+  <text x="705" y="1106" class="lbl-sm">GND</text>
+  <line x1="850" y1="800" x2="740" y2="800" class="wire"/>
+  <line x1="740" y1="800" x2="740" y2="1080" class="wire"/>
+
+  <!-- ======================= WHITE / SHUNT CHANNEL (GP2) &#8212; N1 ======================= -->
+  <line x1="280" y1="220" x2="280" y2="260" class="wire"/>
+  <rect x="272" y="260" width="16" height="60" class="res"/>
+  <text x="296" y="285" class="lbl">R3</text>
+  <text x="296" y="301" class="lbl">2.2k&#8486;</text>
+  <line x1="280" y1="320" x2="280" y2="340" class="wire"/>
+  <circle cx="280" cy="340" r="4" class="node"/>
+  <text x="248" y="334" class="lbl-b">N1</text>
+  <line x1="280" y1="340" x2="850" y2="340" class="wire"/>
+
+  <rect x="170" y="390" width="320" height="310" fill="none" stroke="#8a6d3b" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="180" y="410" class="lbl-sm" fill="#8a6d3b">inside dial &#8212; WHITE pair (N1)</text>
+
+  <line x1="280" y1="340" x2="280" y2="460" class="wire"/>
+  <circle cx="280" cy="460" r="3" class="node"/>
+  <line x1="280" y1="460" x2="316" y2="540" class="wire"/>
+  <circle cx="280" cy="550" r="3" class="node"/>
+  <line x1="280" y1="550" x2="280" y2="1080" class="wire"/>
+  <text x="340" y="480" class="lbl-b">S1</text>
+  <text x="340" y="498" class="lbl-sm">shunt / off-normal</text>
+  <text x="340" y="514" class="lbl-sm">(N.O. at rest)</text>
+
+  <line x1="280" y1="340" x2="430" y2="340" class="wire"/>
+  <line x1="430" y1="340" x2="430" y2="420" class="wire"/>
+  <rect x="422" y="420" width="16" height="60" class="res"/>
+  <text x="452" y="445" class="lbl">R_int</text>
+  <text x="452" y="461" class="lbl">14.5k&#8486;</text>
+  <text x="452" y="481" class="lbl-sm">(bleeder / spark-quench</text>
+  <text x="452" y="495" class="lbl-sm">resistor across contacts)</text>
+  <line x1="430" y1="480" x2="430" y2="650" class="wire"/>
+  <line x1="430" y1="650" x2="280" y2="650" class="wire"/>
+
+  <!-- ======================= BLUE / PULSE CHANNEL (GP3) &#8212; N2 ======================= -->
+  <line x1="850" y1="460" x2="650" y2="460" class="wire"/>
+  <circle cx="650" cy="460" r="4" class="node"/>
+  <text x="618" y="454" class="lbl-b">N2</text>
+
+  <rect x="560" y="510" width="160" height="230" fill="none" stroke="#31708f" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="570" y="530" class="lbl-sm" fill="#31708f">inside dial &#8212; BLUE pair (N2)</text>
+
+  <line x1="650" y1="460" x2="650" y2="560" class="wire"/>
+  <circle cx="650" cy="560" r="3" class="node"/>
+  <line x1="650" y1="560" x2="676" y2="630" class="wire"/>
+  <circle cx="650" cy="640" r="3" class="node"/>
+  <line x1="650" y1="640" x2="650" y2="1080" class="wire"/>
+  <text x="480" y="580" class="lbl-b" text-anchor="end">S2</text>
+  <text x="480" y="596" class="lbl-sm" text-anchor="end">pulse contact</text>
+  <text x="480" y="612" class="lbl-sm" text-anchor="end">(N.C. at rest;</text>
+  <text x="480" y="628" class="lbl-sm" text-anchor="end">opens ~10Hz</text>
+  <text x="480" y="644" class="lbl-sm" text-anchor="end">on spring return)</text>
+
+  <!-- ======================= GREEN/WHITE / SWITCHHOOK CHANNEL (GP4) &#8212; N3 ======================= -->
+  <!-- Routed via x=770 (clear of the blue-pair bracket, which now ends at x=720) -->
+  <line x1="850" y1="580" x2="770" y2="580" class="wire"/>
+  <line x1="770" y1="580" x2="770" y2="790" class="wire"/>
+  <line x1="770" y1="790" x2="400" y2="790" class="wire"/>
+  <circle cx="400" cy="790" r="4" class="node"/>
+  <text x="410" y="784" class="lbl-b">N3</text>
+
+  <rect x="190" y="810" width="340" height="250" fill="none" stroke="#3a8a3a" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="200" y="830" class="lbl-sm" fill="#3a8a3a">under the handset cradle &#8212; GREEN/WHITE pair (N3)</text>
+
+  <!-- C6 hook-line EMI/RC filter (Rev F): 100nF from the GP4 node to GND, mount close to the pin -->
+  <circle cx="770" cy="790" r="3" class="node"/>
+  <line x1="770" y1="790" x2="770" y2="880" class="wire"/>
+  <line x1="762" y1="885" x2="778" y2="885" class="cap"/>
+  <line x1="762" y1="895" x2="778" y2="895" class="cap"/>
+  <text x="756" y="886" text-anchor="end" class="lbl-sm">C6 100nF</text>
+  <text x="756" y="900" text-anchor="end" class="lbl-sm">(EMI/RC filter,</text>
+  <text x="756" y="914" text-anchor="end" class="lbl-sm">close to GP4 pin)</text>
+  <line x1="770" y1="895" x2="770" y2="1080" class="wire"/>
+
+  <line x1="400" y1="790" x2="400" y2="890" class="wire"/>
+  <circle cx="400" cy="890" r="3" class="node"/>
+  <line x1="400" y1="890" x2="430" y2="960" class="wire"/>
+  <circle cx="400" cy="970" r="3" class="node"/>
+  <line x1="400" y1="970" x2="400" y2="1080" class="wire"/>
+  <text x="450" y="910" class="lbl-b">S3</text>
+  <text x="450" y="928" class="lbl-sm">switchhook lever, true dry contact:</text>
+  <text x="450" y="944" class="lbl-sm">pressed (on-hook, handset resting)</text>
+  <text x="450" y="960" class="lbl-sm">= CLOSED (&#8776;0&#8486;)</text>
+  <text x="450" y="980" class="lbl-sm">released (off-hook, lifted) = OPEN</text>
+
+  <!-- ======================= LED CHANNELS (right) ======================= -->
+  <!-- GP14 -->
+  <line x1="1110" y1="340" x2="1160" y2="340" class="wire"/>
+  <rect x="1160" y="332" width="60" height="16" class="res"/>
+  <text x="1165" y="326" class="lbl-sm">R1 330&#8486;</text>
+  <line x1="1220" y1="340" x2="1260" y2="340" class="wire"/>
+  <polygon points="1260,330 1260,350 1290,340" fill="#fff" stroke="#111" stroke-width="2"/>
+  <line x1="1290" y1="330" x2="1290" y2="350" class="wire"/>
+  <line x1="1272" y1="322" x2="1280" y2="312" class="wire"/>
+  <line x1="1280" y1="312" x2="1284" y2="317" class="wire"/>
+  <line x1="1263" y1="320" x2="1271" y2="310" class="wire"/>
+  <line x1="1271" y1="310" x2="1275" y2="315" class="wire"/>
+  <text x="1248" y="368" class="lbl-sm">LED1 &#8220;SHUNT&#8221;</text>
+  <line x1="1290" y1="340" x2="1400" y2="340" class="wire"/>
+  <line x1="1400" y1="340" x2="1400" y2="1080" class="wire"/>
+
+  <!-- GP15 -->
+  <line x1="1110" y1="460" x2="1160" y2="460" class="wire"/>
+  <rect x="1160" y="452" width="60" height="16" class="res"/>
+  <text x="1165" y="446" class="lbl-sm">R2 330&#8486;</text>
+  <line x1="1220" y1="460" x2="1260" y2="460" class="wire"/>
+  <polygon points="1260,450 1260,470 1290,460" fill="#fff" stroke="#111" stroke-width="2"/>
+  <line x1="1290" y1="450" x2="1290" y2="470" class="wire"/>
+  <line x1="1272" y1="442" x2="1280" y2="432" class="wire"/>
+  <line x1="1280" y1="432" x2="1284" y2="437" class="wire"/>
+  <line x1="1263" y1="440" x2="1271" y2="430" class="wire"/>
+  <line x1="1271" y1="430" x2="1275" y2="435" class="wire"/>
+  <text x="1248" y="488" class="lbl-sm">LED2 &#8220;PULSE&#8221;</text>
+  <line x1="1290" y1="460" x2="1450" y2="460" class="wire"/>
+  <line x1="1450" y1="460" x2="1450" y2="1080" class="wire"/>
+
+  <!-- ======================= RECEIVER / SPEAKER DRIVER (MAX98357A over I2S) &#8212; N5 ======================= -->
+  <!-- Rev G: supersedes the revF GP10/R8/Q1/D1/C5 PWM/transistor driver, which
+       had no gain stage (Q1 only switched the coil across the 3.3-5V rail:
+       a few mW at best, confirmed "barely audible" on hardware even at full
+       PWM duty swing). Replaced with a MAX98357A breakout: a real Class-D
+       DAC+amp IC fed over I2S (hardware DMA on the RP2040: no more
+       MicroPython real-time sample-rate bottleneck either). If you still have
+       the old R8/Q1/D1/C5 stage wired, disconnect it: GP10 is now unused.
+       Module moved clear of the LED1/LED2 risers (x=1400/1450) into fresh
+       space starting at x=1460; the four new I2S/VBUS wires from the Pico's
+       top-gap stubs (y=245-311) run right above the LED section (which
+       starts at y=332) then turn down into the module's pin column. -->
+  <text x="1480" y="435" class="lbl-b">Receiver (earpiece) driver &#8212; MAX98357A I2S DAC+amp</text>
+
+  <line x1="1110" y1="245" x2="1460" y2="245" class="wire"/>
+  <line x1="1460" y1="245" x2="1460" y2="500" class="wire"/>
+  <line x1="1460" y1="500" x2="1480" y2="500" class="wire"/>
+  <line x1="1110" y1="267" x2="1465" y2="267" class="wire"/>
+  <line x1="1465" y1="267" x2="1465" y2="530" class="wire"/>
+  <line x1="1465" y1="530" x2="1480" y2="530" class="wire"/>
+  <line x1="1110" y1="289" x2="1470" y2="289" class="wire"/>
+  <line x1="1470" y1="289" x2="1470" y2="560" class="wire"/>
+  <line x1="1470" y1="560" x2="1480" y2="560" class="wire"/>
+  <line x1="1110" y1="311" x2="1475" y2="311" class="wire"/>
+  <line x1="1475" y1="311" x2="1475" y2="590" class="wire"/>
+  <line x1="1475" y1="590" x2="1480" y2="590" class="wire"/>
+
+  <rect x="1480" y="470" width="220" height="230" class="ic"/>
+  <text x="1590" y="460" text-anchor="middle" class="lbl-b">MAX98357A</text>
+  <text x="1590" y="486" text-anchor="middle" class="lbl-sm">(e.g. Adafruit #3006 breakout)</text>
+
+  <text x="1490" y="512" class="lbl-sm">BCLK</text>
+  <text x="1490" y="542" class="lbl-sm">LRC</text>
+  <text x="1490" y="572" class="lbl-sm">DIN</text>
+  <text x="1490" y="602" class="lbl-sm">VIN</text>
+
+  <!-- Module's own GND pin: local connection to the shared GND rail (not a Pico stub) -->
+  <line x1="1480" y1="620" x2="1460" y2="620" class="wire"/>
+  <line x1="1460" y1="620" x2="1460" y2="1080" class="wire"/>
+  <text x="1490" y="624" class="lbl-sm">GND</text>
+
+  <text x="1490" y="650" class="lbl-sm" fill="#555">SD_MODE: leave floating (breakout's</text>
+  <text x="1490" y="664" class="lbl-sm" fill="#555">onboard pull-up enables the amp)</text>
+  <text x="1490" y="680" class="lbl-sm" fill="#555">GAIN: leave floating for default 9dB</text>
+
+  <!-- Speaker/receiver output, bottom of module -->
+  <line x1="1520" y1="700" x2="1520" y2="740" class="wire"/>
+  <text x="1497" y="714" class="lbl-sm">OUT+</text>
+  <line x1="1620" y1="700" x2="1620" y2="722" class="wire"/>
+  <text x="1597" y="714" class="lbl-sm">OUT-</text>
+
+  <!-- Receiver coil, enclosed like the dial/hook components since it lives inside the handset -->
+  <rect x="1500" y="722" width="170" height="90" fill="none" stroke="#7a4a9c" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="1508" y="740" class="lbl-sm" fill="#7a4a9c">inside handset &#8212; WHITE/GREEN (N5)</text>
+  <rect x="1520" y="748" width="110" height="55" class="res"/>
+  <text x="1528" y="770" class="lbl-sm">RECEIVER 50&#8211;300&#8486;</text>
+  <text x="1528" y="784" class="lbl-sm">WHITE/GREEN</text>
+  <line x1="1620" y1="722" x2="1630" y2="748" class="wire"/>
+  <text x="1660" y="760" class="lbl-b">N5</text>
+
+  <text x="1160" y="830" class="lbl-sm">No PWM carrier, no flyback diode, no DC-block cap needed &#8212;</text>
+  <text x="1160" y="846" class="lbl-sm">the MAX98357A's bridged Class-D output is already AC (zero</text>
+  <text x="1160" y="862" class="lbl-sm">average DC across OUT+/OUT-), so it drives the coil directly.</text>
+  <text x="1160" y="882" class="lbl-sm">Verify the receiver's actual DCR with a DMM: if it's much</text>
+  <text x="1160" y="898" class="lbl-sm">higher than the ~4-8&#8486; speaker load this chip expects (a</text>
+  <text x="1160" y="914" class="lbl-sm">vintage coil often is), volume will still be current-limited &#8212;</text>
+  <text x="1160" y="930" class="lbl-sm">but the chip's real gain + 5V bridged swing should still beat</text>
+  <text x="1160" y="946" class="lbl-sm">the old bare-transistor driver by a wide margin.</text>
+
+  <!-- ======================= MIC FRONT END (GP26 / ADC0) &#8212; N4 ======================= -->
+  <!-- Everything below the GND rail belongs to this section; it never crosses the dial/hook wiring above. -->
+  <text x="150" y="1105" class="lbl-b">Carbon mic front end (RED/BLACK)</text>
+
+  <text x="82" y="1096" class="lbl-sm">3V3</text>
+  <line x1="70" y1="1118" x2="70" y2="1150" class="wire"/>
+  <rect x="62" y="1150" width="16" height="50" class="res"/>
+  <text x="88" y="1170" class="lbl">R4</text>
+  <text x="88" y="1186" class="lbl">220&#8211;330&#8486;</text>
+  <text x="88" y="1202" class="lbl-sm">(~10mA bias)</text>
+  <line x1="70" y1="1200" x2="70" y2="1230" class="wire"/>
+  <circle cx="70" cy="1230" r="4" class="node"/>
+  <text x="15" y="1224" class="lbl-b">N4</text>
+
+  <!-- decoupling C1/C2 on the bias node, tied straight up to the GND rail (clear column, nothing else there) -->
+  <line x1="70" y1="1150" x2="20" y2="1150" class="wire"/>
+  <line x1="20" y1="1150" x2="20" y2="1105" class="wire"/>
+  <line x1="12" y1="1105" x2="28" y2="1105" class="cap"/>
+  <line x1="12" y1="1095" x2="28" y2="1095" class="cap"/>
+  <line x1="20" y1="1095" x2="20" y2="1080" class="wire"/>
+  <text x="34" y="1103" class="lbl-sm">C1 100&#956;F</text>
+  <line x1="48" y1="1150" x2="48" y2="1128" class="wire"/>
+  <line x1="40" y1="1128" x2="56" y2="1128" class="cap"/>
+  <line x1="40" y1="1118" x2="56" y2="1118" class="cap"/>
+  <line x1="48" y1="1118" x2="48" y2="1080" class="wire"/>
+  <text x="60" y="1130" class="lbl-sm">C2 100nF</text>
+
+  <!-- mic symbol: variable resistor (zigzag + diagonal arrow), boxed like the dial/hook components -->
+  <line x1="70" y1="1230" x2="70" y2="1250" class="wire"/>
+  <rect x="30" y="1250" width="160" height="120" fill="none" stroke="#a03a3a" stroke-width="1.5" stroke-dasharray="7,5"/>
+  <text x="40" y="1268" class="lbl-sm" fill="#a03a3a">inside handset &#8212; RED/BLACK pair (mic, N4)</text>
+  <rect x="50" y="1280" width="40" height="60" class="res"/>
+  <line x1="44" y1="1340" x2="96" y2="1274" class="wire"/>
+  <polygon points="96,1274 88,1276 94,1282" fill="#111"/>
+  <text x="100" y="1300" class="lbl-b">MIC</text>
+  <text x="100" y="1316" class="lbl-sm">carbon</text>
+  <text x="100" y="1330" class="lbl-sm">~0.5&#8211;5k&#8486;</text>
+  <line x1="70" y1="1340" x2="70" y2="1370" class="wire"/>
+
+  <!-- mic bottom terminal ground, jogged left (clear of the signal chain) then up to the shared rail -->
+  <line x1="70" y1="1370" x2="10" y2="1370" class="wire"/>
+  <line x1="10" y1="1370" x2="10" y2="1080" class="wire"/>
+
+  <!-- AC coupling C3 into the signal chain (drawn above the mic bracket, y=1230, well clear of every ground jog) -->
+  <line x1="70" y1="1230" x2="240" y2="1230" class="wire"/>
+  <line x1="245" y1="1220" x2="245" y2="1240" class="cap"/>
+  <line x1="255" y1="1220" x2="255" y2="1240" class="cap"/>
+  <text x="195" y="1203" class="lbl-sm">C3 1&#8211;10&#956;F</text>
+  <text x="195" y="1216" class="lbl-sm">(AC couple)</text>
+  <line x1="260" y1="1230" x2="320" y2="1230" class="wire"/>
+  <circle cx="320" cy="1230" r="3" class="node"/>
+
+  <!-- R5 lowpass series resistor -->
+  <line x1="320" y1="1230" x2="350" y2="1230" class="wire"/>
+  <rect x="350" y="1222" width="70" height="16" class="res"/>
+  <text x="355" y="1210" class="lbl-sm">R5 4.7k&#8486;</text>
+  <line x1="420" y1="1230" x2="460" y2="1230" class="wire"/>
+
+  <!-- Node B: ADC bias/filter node, bus continues right to the GP26 riser at x=800 -->
+  <circle cx="460" cy="1230" r="4" class="node"/>
+  <text x="465" y="1254" class="lbl-sm">N_B &#8594; GP26</text>
+  <line x1="460" y1="1230" x2="800" y2="1230" class="wire"/>
+  <text x="600" y="1216" class="lbl-sm">bias &#8776; 1.65V (R6/R7 divider, 3V3&#215;&#189;)</text>
+
+  <!-- R6 up to 3V3 (net label) -->
+  <line x1="460" y1="1230" x2="460" y2="1180" class="wire"/>
+  <rect x="452" y="1130" width="16" height="50" class="res"/>
+  <text x="472" y="1150" class="lbl-sm">R6 100k&#8486;</text>
+  <line x1="460" y1="1130" x2="460" y2="1110" class="wire"/>
+  <text x="470" y="1104" class="lbl-sm">3V3</text>
+
+  <!-- C4 lowpass to GND, jogged right then up to the shared rail -->
+  <line x1="460" y1="1230" x2="460" y2="1260" class="wire"/>
+  <line x1="452" y1="1265" x2="468" y2="1265" class="cap"/>
+  <line x1="452" y1="1275" x2="468" y2="1275" class="cap"/>
+  <text x="474" y="1272" class="lbl-sm">C4 10nF</text>
+  <line x1="460" y1="1275" x2="460" y2="1310" class="wire"/>
+  <line x1="460" y1="1310" x2="510" y2="1310" class="wire"/>
+  <line x1="510" y1="1310" x2="510" y2="1080" class="wire"/>
+
+  <!-- R7 divider bottom leg to GND, jogged right then up to the shared rail -->
+  <circle cx="530" cy="1230" r="3" class="node"/>
+  <line x1="460" y1="1230" x2="530" y2="1230" class="wire"/>
+  <line x1="530" y1="1230" x2="530" y2="1280" class="wire"/>
+  <rect x="522" y="1280" width="16" height="50" class="res"/>
+  <text x="544" y="1300" class="lbl-sm">R7</text>
+  <text x="544" y="1314" class="lbl-sm">100k&#8486;</text>
+  <line x1="530" y1="1330" x2="530" y2="1350" class="wire"/>
+  <line x1="530" y1="1350" x2="570" y2="1350" class="wire"/>
+  <line x1="570" y1="1350" x2="570" y2="1080" class="wire"/>
+
+  <!-- bus riser to GP26 pin: crosses the GND rail gap (no connection) then up to the pin -->
+  <line x1="800" y1="1230" x2="800" y2="700" class="wire"/>
+  <line x1="800" y1="700" x2="850" y2="700" class="wire"/>
+
+  <!-- ======================= ANALYSIS BOXES ======================= -->
+  <rect x="20" y="1420" width="1550" height="110" fill="#e3ecf7" stroke="#3a6ea5" stroke-width="1.5"/>
+  <text x="32" y="1440" class="lbl-b" fill="#1c3f66">Switchhook (S3) behavior and firmware mapping</text>
+  <text x="32" y="1458" class="lbl-sm" fill="#1c3f66">S3 is a true dry contact (DMM confirmed: &#8776;0&#8486; pressed, open released), same as BLUE. Internal Pin.PULL_UP on GP4 is sufficient; C6 100nF to GND adds EMI immunity for the long handset cord (RC &#8776; 5&#8211;8ms).</text>
+  <text x="32" y="1476" class="lbl-sm" fill="#1c3f66">Lever PRESSED (handset resting) = on-hook = GP4 LOW (closed to GND) = MUTE (main.py sends a 0% volume HID report, remembering the last dialed target).</text>
+  <text x="32" y="1494" class="lbl-sm" fill="#1c3f66">Lever RELEASED (handset lifted) = off-hook = GP4 HIGH (pulled to 3V3) = firmware restores the last dialed volume target automatically.</text>
+  <text x="32" y="1512" class="lbl-sm" fill="#1c3f66">Debounce: 30ms (heavier lever spring than the dial contacts, which use 15ms). Polarity within the GREEN/WHITE pair does not matter.</text>
+
+  <rect x="20" y="1545" width="1550" height="140" fill="#eaf3ea" stroke="#3a8a3a" stroke-width="1.5"/>
+  <text x="32" y="1565" class="lbl-b" fill="#1e5c1e">Mic + receiver front end &#8212; status &amp; next steps (Rev G)</text>
+  <text x="32" y="1583" class="lbl-sm" fill="#1e5c1e">Mic front end (Phase 1) COMPLETE and hardware-verified: bias measured 1.648V, dead-center of the 1.65V target. No changes in Rev G.</text>
+  <text x="32" y="1601" class="lbl-sm" fill="#1e5c1e">Receiver driver (Phase 2) REVISED in Rev G: the bare-transistor PWM driver (GP10/R8/Q1/D1/C5) is superseded by a MAX98357A I2S DAC+amp module -- it has real gain, unlike a plain switch, and offloads audio timing to RP2040 DMA hardware instead of a MicroPython loop.</text>
+  <text x="32" y="1619" class="lbl-sm" fill="#1e5c1e">Any film/polyester/polypropylene caps on hand are fine for C3 (coupling) and C4 (filter); use electrolytic for the bulk C1 (100&#956;F) bias decoupling &#8212; film at that value is unnecessarily large.</text>
+  <text x="32" y="1637" class="lbl-sm" fill="#1e5c1e">Next: rewire GP16/17/18 + VBUS/GND to the MAX98357A per this diagram (disconnect the old R8/Q1/D1/C5 stage), rewrite receiver_test.py to use machine.I2S instead of PWM, then re-test tone/melody/PCM playback.</text>
+  <text x="32" y="1655" class="lbl-sm" fill="#1e5c1e">Component hunt list: R4 220&#8211;330&#8486;, R5 4.7k, R6/R7 2&#215;100k; C1 100&#956;F, C2 100nF, C3 1&#8211;10&#956;F, C4 10nF, C6 100nF; one MAX98357A breakout module (replaces R8/Q1/D1/C5/general NPN/1N4148 from Rev F).</text>
+</svg>
