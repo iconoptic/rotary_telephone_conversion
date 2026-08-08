@@ -192,6 +192,51 @@ def supply(volts):
     return cap
 
 
+def bringup(dc_pause_s=2, hold_seconds=4, ring_after=False):
+    """Guided progressive test sequence for a fully-wired Rev P bell stage
+    (T1/Q2/Q3 built, RED/BLACK already attached -- unlike the earlier
+    disconnected-secondary bench protocol). Chains the existing lowest-
+    -energy-first tests instead of stringing them together by hand each
+    bring-up session, printing VSYS-meter evidence at every stage.
+    Stages (each also callable standalone if one needs a re-run):
+      1. vsys() -- idle rail baseline.
+      2. dc_test('a'), dc_test('b') -- 10ms capped pulses, `dc_pause_s`
+         apart. Lowest-energy check that each gate/FET/winding conducts
+         and the rail doesn't sag hard, before committing to sustained
+         drive. Safe regardless of jumper 2-3 phasing (a single pulse
+         doesn't depend on the two HV halves summing).
+      3. hold(hold_seconds) -- short continuous 25Hz drive. THIS is the
+         phasing check: read AC volts across the bell leads (or R18-to-
+         RED/BLACK) on a DMM now -- ~85-96Vac loaded means jumper 2-3 is
+         series-aiding (correct); near-0V means series-opposing (power
+         off, swap one end of that jumper, re-run).
+      4. ring() -- the real 2s-ring/4s-pause cadence, ONLY if
+         ring_after=True (default False, so you can read the DMM and
+         decide before the full cadence runs).
+    Ctrl-C during any stage aborts that stage only (each underlying
+    function already stops the bell in its own finally block).
+    """
+    print("=== STAGE 1/4: idle VSYS baseline ===")
+    vsys()
+    print("=== STAGE 2/4: dc_test each gate (10ms capped, lowest energy) ===")
+    print("-- gate A --")
+    dc_test('a')
+    time.sleep(dc_pause_s)
+    print("-- gate B --")
+    dc_test('b')
+    time.sleep(dc_pause_s)
+    print("=== STAGE 3/4: hold({}s) -- READ DMM AC VOLTS ACROSS THE BELL NOW ===".format(
+        hold_seconds))
+    print("expect ~85-96Vac (phasing OK); near-0V means jumper 2-3 is series-opposing")
+    hold(hold_seconds)
+    if ring_after:
+        print("=== STAGE 4/4: full ring() cadence ===")
+        ring()
+    else:
+        print("bringup() stopped after the diagnostic hold -- call ring() directly, "
+              "or re-run bringup(ring_after=True), once the Stage 3 reading looks right.")
+
+
 def sweep(freqs=(15, 18, 20, 23, 26, 30, 35, 40), on_ms_list=None, dwell=4, pause=1.5):
     """Walks every (freq, on_ms) combination via strike(), `dwell` seconds
     each with a `pause`-second gap so attempts are audibly distinct. Prints
@@ -237,6 +282,7 @@ def ir_monitor(seconds=10):
 
 
 if __name__ == "__main__":
-    print("Bell + IR bring-up tool ready. Call ring(), hold(), dc_test('a'/'b'),")
+    print("Bell + IR bring-up tool ready. Call bringup() for the guided progressive")
+    print("test sequence, or individually: ring(), hold(), dc_test('a'/'b'),")
     print("gate_hold('a'/'b', 0/1, seconds), set_freq(hz), ir_sample(), ir_calibrate(), or ir_monitor(seconds).")
     ir_calibrate()

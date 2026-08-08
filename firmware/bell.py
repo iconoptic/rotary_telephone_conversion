@@ -50,6 +50,14 @@ ticks_diff() handles that correctly, unlike Arduino's unsigned millis()
 subtraction trick). update() must be called on every pass of the caller's
 main loop, unconditionally, so half-cycles/deadband stay accurate -- do NOT
 gate it behind a slower polling interval.
+
+CONFIRMED-GOOD DRIVE (2026-08-07, after gong reinstall/realignment): full-
+square mode at DEFAULT_RING_FREQ_HZ (25Hz), supply_v=5.0 -- i.e. these exact
+module defaults -- reliably strikes the gong ("totally acceptable" per
+bench test with bell_sweep_test.targeted_sweep()). No parameter change was
+needed; the vibrates-but-doesn't-strike symptom was purely mechanical
+(gong/clapper alignment), not electrical. Do not lower these defaults
+without re-running targeted_sweep() first.
 """
 
 import time
