@@ -1,0 +1,702 @@
+
+
+================================================================
+== FILE: main.py
+================================================================
+
+"""
+Rotary dial DECODER + switchhook + LED status + USB HID absolute volume
+control + bell ring generator + IR proximity trigger, for the Raspberry Pi
+Pico (RP2040/MicroPython) -- Rev N.
+
+Rev N -- MCU migration BACK from the Adafruit ItsyBitsy 32u4 (Rev I-M),
+which failed (overheated, stopped enumerating over USB) during bell-driver
+bring-up. This restores the original dial/hook/HID subset (legacy_pico/)
+and ALSO ports the bell ring generator + IR trigger that were designed and
+firmware-complete on the ItsyBitsy but never had a Pico equivalent -- see
+docs/pico_port_handoff_prompt.md for the full port mandate and
+/memories/repo/vintage_headset.md for the design history.
+
+WIRING (see docs/rotary_dial_circuit_revN.svg once drawn):
+  SHUNT_PIN (GP2)  -- White pair (dial off-normal). ~14.5kohm internal
+                      bleeder resistor in parallel with the contact at
+                      rest, so an EXTERNAL 2.2kohm pull-up to 3V3 (R3) is
+                      MANDATORY -- the internal ~50-80kohm pull-up is too
+                      weak and would leave GP2 below VIH even at rest.
+  PULSE_PIN (GP3)  -- Blue pair (dial pulse contact). True dry contact,
+                      internal Pin.PULL_UP is fine.
+  HOOK_PIN  (GP4)  -- Green/White switchhook lever. True dry contact,
+                      internal Pin.PULL_UP is fine. Debounce 30ms (heavier
+                      spring than the dial contacts' 15ms).
+  LED_SHUNT (GP14) -- 330ohm -> LED -> GND. Lit while the dial is off-normal.
+  LED_PULSE (GP15) -- 330ohm -> LED -> GND. Mirrors the raw pulse contact.
+  LED_HOOK  (GP16) -- 330ohm -> LED -> GND. NEW this revision -- no Pico
+                      equivalent existed before; mirrors the ItsyBitsy's
+                      LED_HOOK_PIN/D11 (Rev I/J). Lit while ON-HOOK (muted).
+  BELL_A    (GP17) -- push-pull gate A. See bell.py's module docstring for
+                      the full NPN level-shifter gate-drive design (the
+                      3V3 GPIO does not reliably enhance the on-hand
+                      IRFZ44N directly) -- this pin is driven ACTIVE-LOW.
+  BELL_B    (GP18) -- push-pull gate B. Same active-low convention.
+  IR_TX     (GP19) -- IR emitter LED (via R10). Digital out.
+  IR_RX     (GP26/ADC0) -- IR phototransistor emitter-follower (+ R11 to
+                      GND). Analog in.
+
+BELL/IR: see bell.py and ir_trigger.py module docstrings for the full
+theory of operation. The bell only rings while ON-HOOK (mirrors the
+ItsyBitsy firmware's refusal to ring into a lifted handset) and is
+silenced immediately if the handset is answered mid-ring. IR sampling is
+skipped entirely while the bell is ringing (a sample blocks for a couple
+hundred microseconds and would distort the ring waveform).
+
+ARCHITECTURE CHANGE FROM THE ORIGINAL legacy_pico/main.py: the old main
+loop drained the dial/hook IRQ event queue then `time.sleep_ms(5)`. The
+bell generator's 1ms deadband needs sub-5ms servicing, so this revision
+calls `bell.update(now)` on every single pass of the loop, unconditionally,
+with no sleep at all -- mirroring the ItsyBitsy .ino's unthrottled loop().
+Dial/hook stay interrupt-driven (proven architecture, dial_test_log.txt
+baseline) and are drained every pass too, just without an added delay.
+VERIFY EMPIRICALLY (log actual half-period min/max via time.ticks_us())
+that plain-Python MicroPython keeps up before adding any complexity like
+@micropython.native -- per hard-won experience elsewhere in this repo,
+that decorator has caused a SILENT regression before (see user memory).
+
+LOGGING: everything printed here goes out over the USB serial REPL. To
+save a permanent log file on your host while testing:
+    mpremote connect /dev/ttyACM0 run main.py | tee dial_test_log_reN.txt
+
+HID: vendor-defined usage page 0xFF00, usage 0x01, single-byte absolute
+volume percent report (0-100) -- see hid_consumer.py. Read on the host by
+host/volume_daemon.py via /dev/hidrawN, VID:PID 2e8a:0005.
+"""
+
+import time
+from machine import Pin
+import usb.device
+from hid_consumer import VolumeHID
+from bell import BellRinger
+from ir_trigger import IRTrigger
+
+SHUNT_PIN = 2
+PULSE_PIN = 3
+HOOK_PIN = 4
+
+LED_SHUNT_PIN = 14
+LED_PULSE_PIN = 15
+LED_HOOK_PIN = 16
+
+BELL_A_PIN = 17
+BELL_B_PIN = 18
+IR_TX_PIN = 19
+IR_RX_PIN = 26
+
+DEBOUNCE_MS = 15
+HOOK_DEBOUNCE_MS = 30
+
+shunt = Pin(SHUNT_PIN, Pin.IN)              # no internal pull -- R3 does the job
+pulse = Pin(PULSE_PIN, Pin.IN, Pin.PULL_UP)
+hook = Pin(HOOK_PIN, Pin.IN, Pin.PULL_UP)
+
+led_shunt = Pin(LED_SHUNT_PIN, Pin.OUT)
+led_pulse = Pin(LED_PULSE_PIN, Pin.OUT)
+led_hook = Pin(LED_HOOK_PIN, Pin.OUT)
+
+bell = BellRinger(BELL_A_PIN, BELL_B_PIN, active_low=True)
+ir = IRTrigger(IR_TX_PIN, IR_RX_PIN)
+
+# Re-enumerates the USB device (builtin_driver=True keeps the CDC/REPL
+# connection alive as a composite device) -- any existing mpremote/serial
+# connection will briefly drop and need reconnecting.
+hid = VolumeHID()
+usb.device.get().init(hid, builtin_driver=True)
+
+
+def digit_to_percent(digit):
+    return 100 if digit == 0 else digit * 10
+
+
+# Small fixed-size ring buffer filled by the IRQs, drained by the main loop.
+_EVQ_LEN = 128
+_evq = [(0, '', 0)] * _EVQ_LEN
+_evq_head = 0
+_evq_tail = 0
+_last_irq_ms = {'SHUNT': 0, 'PULSE': 0, 'HOOK': 0}
+
+
+def _push(now, ch, val):
+    global _evq_head
+    _evq[_evq_head] = (now, ch, val)
+    _evq_head = (_evq_head + 1) % _EVQ_LEN
+
+
+def _shunt_irq(pin):
+    now = time.ticks_ms()
+    if time.ticks_diff(now, _last_irq_ms['SHUNT']) < DEBOUNCE_MS:
+        return
+    _last_irq_ms['SHUNT'] = now
+    at_rest = pin.value() == 1
+    led_shunt.value(0 if at_rest else 1)
+    _push(now, 'SHUNT', 0 if at_rest else 1)
+
+
+def _pulse_irq(pin):
+    now = time.ticks_ms()
+    if time.ticks_diff(now, _last_irq_ms['PULSE']) < DEBOUNCE_MS:
+        return
+    _last_irq_ms['PULSE'] = now
+    closed = pin.value() == 0
+    led_pulse.value(1 if closed else 0)
+    _push(now, 'PULSE', 1 if closed else 0)
+
+
+def _hook_irq(pin):
+    now = time.ticks_ms()
+    if time.ticks_diff(now, _last_irq_ms['HOOK']) < HOOK_DEBOUNCE_MS:
+        return
+    _last_irq_ms['HOOK'] = now
+    closed = pin.value() == 0
+    _push(now, 'HOOK', 1 if closed else 0)
+
+
+shunt.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_shunt_irq)
+pulse.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_pulse_irq)
+hook.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_hook_irq)
+
+print("Rotary dial decoder (Rev N, Pico) + HID volume + bell + IR trigger ready.")
+print("SHUNT=GP2 (White, ext. 2.2kohm pull-up)  PULSE=GP3 (Blue, int. pull-up)")
+print("HOOK=GP4 (Green/White, int. pull-up)  BELL=GP17/18 (active-low)  IR TX=GP19 RX=GP26")
+print("Dial a digit and watch the log + LEDs. digit N -> N*10% volume (0 -> 100%)")
+print("Lift handset to unmute/restore volume, replace handset to mute.")
+print("-" * 60)
+
+dial_active = False
+make_count = 0
+last_volume_percent = 50
+on_hook = (hook.value() == 0)
+led_hook.value(1 if on_hook else 0)
+if on_hook:
+    print("Startup state: ON-HOOK (muted)")
+    hid.set_volume_percent(0)
+else:
+    print("Startup state: OFF-HOOK, volume {}%".format(last_volume_percent))
+    hid.set_volume_percent(last_volume_percent)
+
+irb = ir.calibrate()
+print("IR baseline (emitter/detector crosstalk) = {} counts; trigger above {}".format(
+    irb, irb + ir.margin))
+
+while True:
+    now = time.ticks_ms()
+
+    # Serviced every pass, unconditionally, so half-cycles/deadband stay accurate.
+    bell.update(now)
+
+    while _evq_tail != _evq_head:
+        ev_now, ch, val = _evq[_evq_tail]
+        _evq_tail = (_evq_tail + 1) % _EVQ_LEN
+
+        if ch == 'SHUNT':
+            moved = bool(val)
+            print("[{:>8d}ms] SHUNT -> {}".format(
+                ev_now, "OFF-NORMAL (dial moving)" if moved else "AT REST"))
+            if moved and not dial_active:
+                dial_active = True
+                make_count = 0
+            elif not moved and dial_active:
+                dial_active = False
+                digit = 0 if make_count == 10 else make_count
+                print(">>> DIALED DIGIT: {} ({} pulses)".format(digit, make_count))
+                last_volume_percent = digit_to_percent(digit)
+                if on_hook:
+                    print("    -> ON-HOOK (muted); volume target updated to {}% but held muted".format(
+                        last_volume_percent))
+                else:
+                    ok = hid.set_volume_percent(last_volume_percent)
+                    print("    -> HID volume report sent: {}% (open={})".format(last_volume_percent, ok))
+        elif ch == 'PULSE':
+            closed = bool(val)
+            print("[{:>8d}ms] PULSE -> {}".format(
+                ev_now, "MAKE (closed)" if closed else "BREAK (open)"))
+            if dial_active and closed:
+                make_count += 1
+        else:  # HOOK
+            closed = bool(val)
+            on_hook = closed
+            led_hook.value(1 if on_hook else 0)
+            if on_hook:
+                print("[{:>8d}ms] HOOK -> ON-HOOK (handset down) -> MUTE".format(ev_now))
+                hid.set_volume_percent(0)
+            else:
+                print("[{:>8d}ms] HOOK -> OFF-HOOK (handset lifted) -> RESTORE {}%".format(
+                    ev_now, last_volume_percent))
+                hid.set_volume_percent(last_volume_percent)
+                if not bell.is_idle():
+                    print("    -> handset answered, bell silenced")
+                    bell.stop()
+
+    # IR proximity trigger -- only while the bell isn't already ringing (a
+    # sample blocks briefly and would distort the ring waveform anyway).
+    if bell.is_idle() and ir.poll(now):
+        if on_hook:
+            print("[{:>8d}ms] IR TRIGGER -> ringing".format(now))
+            bell.start(now)
+        else:
+            print("[{:>8d}ms] IR TRIGGER -> ignored, handset off-hook".format(now))
+
+
+================================================================
+== FILE: bell.py
+================================================================
+
+"""
+Bell ring generator for the Raspberry Pi Pico (RP2040/MicroPython) -- Rev N.
+
+Non-blocking push-pull driver, ported from legacy_itsybitsy/rotary_volume/
+rotary_volume.ino and legacy_itsybitsy/bell_ir_test/bell_ir_test.ino. This
+never had a Pico implementation before this port.
+
+THEORY (unchanged from the ItsyBitsy design -- see docs/transformer_primer.md
+and docs/revK_design_review/ for the full derivation, not re-derived here):
+the ringer coil (5.97kohm DC) needs ~90V/20Hz-class drive to move the
+clapper, far beyond anything a bare 5V/3V3 GPIO can supply directly. BELL_A/
+BELL_B alternately ground the two halves of a centre-tapped step-up
+transformer's LV winding (centre tap on 5V); the HV winding drives the bell.
+Currently T1 = Hammond 161G24 (single-primary, 60Hz-only core) -> saturation
+floor 28Hz, default 30Hz.
+
+GATE DRIVE -- ACTIVE-LOW, NOT A DIRECT PORT OF THE .ino LOGIC LEVELS:
+the Pico's GPIO HIGH is 3V3, and the on-hand Q2/Q3 (IRFZ44N) have Vgs(th) up
+to 4V -- 3V3 is not a reliable full-enhancement drive. Rather than buy a new
+logic-level FET, each gate gets an NPN open-collector inverting level
+shifter (Q5/Q6, e.g. 2N3904/2N2222 -- common small-signal bipolar; Q4 is
+already the IR phototransistor):
+    GPIO --Rb(~1k)--> NPN base <--pull-up(~10k)-- 5V
+    NPN emitter -> GND
+    NPN collector --pull-up Rc(~1k)--> 5V, feeds into the existing R12/R13
+        100ohm gate series resistor -> Q2/Q3 gate (existing R14/R15 10k
+        gate pulldowns stay, now a redundant-but-harmless second safety net)
+This means: GPIO HIGH -> NPN ON -> collector pulled LOW -> Q2/Q3 gate LOW ->
+FET OFF. GPIO LOW -> NPN OFF -> Rc pulls the gate HIGH -> FET ON. Critically,
+the base pull-up makes "GPIO floating" (MCU reset/boot, before firmware
+configures the pin) equivalent to "GPIO HIGH" -- NPN ON, FET OFF -- so the
+bell defaults OFF at boot/reset, not ON. This module therefore drives its
+output pins ACTIVE-LOW (`_ON_LEVEL = 0`); if the final hardware instead
+drives Q2/Q3 directly (no level shifter), flip `active_low=False` in the
+constructor and nothing else needs to change.
+Resistor values above are starting points only -- bench-verify (scope the
+gate node) before trusting them; see docs/pico_port_handoff_prompt.md and
+the Phase 5 schematic work for the final component selection.
+
+SOFT-START: from zero flux, a full-length first half-cycle would drive the
+core to ~1.86x rated flux (deep saturation, amp-class current spike,
+possible brownout right as the phone tries to ring). The first half-cycle
+after any idle period or inter-burst gap is therefore half-length -- see
+`_first_half_cycle` below.
+
+TIMING: this is verified against wall-clock ms via time.ticks_ms()/
+ticks_diff() (not raw subtraction -- MicroPython's tick counter wraps and
+ticks_diff() handles that correctly, unlike Arduino's unsigned millis()
+subtraction trick). update() must be called on every pass of the caller's
+main loop, unconditionally, so half-cycles/deadband stay accurate -- do NOT
+gate it behind a slower polling interval.
+"""
+
+import time
+from machine import Pin
+
+# Saturation floor/ceiling for the on-hand T1 (Hammond 161G24, 60Hz-only
+# core): flux ratio = 333/(hz*12), so 28Hz = ~0.99x rated (last safe integer
+# hertz), 30Hz = 0.93x (default, matches the ItsyBitsy design's safety
+# margin). Re-derive (see docs/transformer_primer.md) if the transformer
+# changes -- e.g. a dual-primary 160G24 drops the floor to 23Hz.
+MIN_RING_FREQ_HZ = 28
+MAX_RING_FREQ_HZ = 40
+DEFAULT_RING_FREQ_HZ = 30
+
+RING_DEADBAND_MS = 1     # both gates OFF across every half-cycle transition
+RING_BURST_MS = 2000     # "ring" portion of the cadence
+RING_GAP_MS = 4000       # "silence" portion of the cadence
+RING_BURSTS = 2          # bursts per trigger
+DC_TEST_MS = 10          # capped per revK_design_review finding #1 (was 1000ms -> ~2.5A rail short)
+
+IDLE, BURST, GAP, HOLD, DC_TEST = range(5)
+
+
+class BellRinger:
+    def __init__(self, pin_a, pin_b, active_low=True, ring_freq_hz=DEFAULT_RING_FREQ_HZ):
+        self.active_low = active_low
+        self._on_level = 0 if active_low else 1
+        self._off_level = 1 if active_low else 0
+        self.pin_a = Pin(pin_a, Pin.OUT)
+        self.pin_b = Pin(pin_b, Pin.OUT)
+        self._gates_off()
+
+        self.ring_freq_hz = ring_freq_hz
+        self.half_period_ms = 500 // ring_freq_hz
+
+        self.state = IDLE
+        self.bursts_left = 0
+        self.cadence_start_ms = 0
+        self.toggle_ms = 0
+        self.phase_b = False
+        self.in_deadband = False
+        self.first_half_cycle = False
+        self.dc_test_pin = None
+
+    def _gates_off(self):
+        self.pin_a.value(self._off_level)
+        self.pin_b.value(self._off_level)
+
+    def set_ring_freq(self, hz):
+        hz = max(MIN_RING_FREQ_HZ, min(MAX_RING_FREQ_HZ, hz))
+        self.ring_freq_hz = hz
+        self.half_period_ms = 500 // hz
+        return hz
+
+    def is_idle(self):
+        return self.state == IDLE
+
+    def start(self, now_ms, hold=False):
+        """Begin the standard ring cadence, or continuous 'hold' for bench testing."""
+        self.state = HOLD if hold else BURST
+        self.bursts_left = 0 if hold else RING_BURSTS
+        self.cadence_start_ms = now_ms
+        self.toggle_ms = now_ms
+        self.phase_b = False
+        self.in_deadband = True
+        self.first_half_cycle = True
+        self._gates_off()
+
+    def stop(self):
+        self._gates_off()
+        self.state = IDLE
+        self.bursts_left = 0
+        self.in_deadband = False
+
+    def dc_test(self, gate, now_ms):
+        """Capped-duration (DC_TEST_MS) single-gate continuity check -- NOT a
+        substitute for the unpowered DMM R(3-6)~=2xR(3-4) check."""
+        self._gates_off()
+        self.state = DC_TEST
+        self.cadence_start_ms = now_ms
+        self.dc_test_pin = self.pin_b if gate == 'b' else self.pin_a
+        self.dc_test_pin.value(self._on_level)
+
+    def update(self, now_ms):
+        """Call on every pass of the main loop, unconditionally."""
+        if self.state == IDLE:
+            return
+
+        if self.state == DC_TEST:
+            if time.ticks_diff(now_ms, self.cadence_start_ms) >= DC_TEST_MS:
+                self._gates_off()
+                self.state = IDLE
+            return
+
+        if self.state == GAP:
+            if time.ticks_diff(now_ms, self.cadence_start_ms) >= RING_GAP_MS:
+                self.state = BURST
+                self.cadence_start_ms = now_ms
+                self.toggle_ms = now_ms
+                self.in_deadband = True
+                self.first_half_cycle = True
+            return
+
+        # BURST or HOLD: run the oscillator; BURST additionally times out.
+        if self.state == BURST and time.ticks_diff(now_ms, self.cadence_start_ms) >= RING_BURST_MS:
+            self._gates_off()
+            self.in_deadband = False
+            self.bursts_left -= 1
+            if self.bursts_left <= 0:
+                self.state = IDLE
+            else:
+                self.state = GAP
+                self.cadence_start_ms = now_ms
+            return
+
+        this_half_ms = (self.half_period_ms // 2) if self.first_half_cycle else self.half_period_ms
+        if time.ticks_diff(now_ms, self.toggle_ms) >= this_half_ms:
+            self._gates_off()
+            self.toggle_ms = now_ms
+            self.phase_b = not self.phase_b
+            self.in_deadband = True
+            self.first_half_cycle = False
+        elif self.in_deadband and time.ticks_diff(now_ms, self.toggle_ms) >= RING_DEADBAND_MS:
+            (self.pin_b if self.phase_b else self.pin_a).value(self._on_level)
+            self.in_deadband = False
+
+
+================================================================
+== FILE: ir_trigger.py
+================================================================
+
+"""
+IR proximity trigger for the Raspberry Pi Pico (RP2040/MicroPython) -- Rev N.
+
+Ported from legacy_itsybitsy/bell_ir_test/bell_ir_test.ino's irReadDelta()/
+irCalibrate()/trigger-confirm loop. This never had a Pico implementation
+before this port.
+
+THEORY (unchanged): these are bare 2-leg phototransistors, no TSOP/38kHz
+demodulator module, so ambient light is rejected by SYNCHRONOUS SAMPLING in
+software instead -- read the ADC with the emitter off, then on, and use the
+difference. The emitter and detector sit side by side, so there is always
+some direct optical crosstalk; that resting delta is measured once at boot
+(baseline) and the trigger threshold sits above it, making this a
+reflective proximity sensor (wave a hand in front of the pair -> trigger).
+
+RETUNE FROM SCRATCH ON REAL HARDWARE, do not trust the constants below as
+final: they are placeholders carried over in spirit (not value) from the
+AVR/10-bit-ADC design. The RP2040's ADC is 12-bit (read_u16() here returns
+a 16-bit-scaled value, 0-65535) with different noise/timing characteristics
+-- IR_SETTLE_US and TRIGGER_MARGIN both need fresh bench calibration.
+"""
+
+import time
+from machine import ADC, Pin
+
+IR_SAMPLE_INTERVAL_MS = 25
+IR_SETTLE_US = 200          # retune on hardware -- see module docstring
+IR_CALIBRATION_SAMPLES = 32
+IR_TRIGGER_MARGIN = 2600    # placeholder: ~40 counts on a 10-bit ADC, scaled to read_u16()'s 16-bit range
+IR_CONFIRM_SAMPLES = 3
+IR_LOCKOUT_MS = 5000
+
+
+class IRTrigger:
+    def __init__(self, tx_pin, rx_adc_pin,
+                 settle_us=IR_SETTLE_US,
+                 margin=IR_TRIGGER_MARGIN,
+                 confirm_samples=IR_CONFIRM_SAMPLES,
+                 lockout_ms=IR_LOCKOUT_MS,
+                 calibration_samples=IR_CALIBRATION_SAMPLES):
+        self.tx = Pin(tx_pin, Pin.OUT)
+        self.tx.value(0)
+        self.rx = ADC(Pin(rx_adc_pin))
+
+        self.settle_us = settle_us
+        self.margin = margin
+        self.confirm_samples = confirm_samples
+        self.lockout_ms = lockout_ms
+        self.calibration_samples = calibration_samples
+
+        self.baseline = 0
+        self.hits = 0
+        self.last_delta = 0
+        self.last_sample_ms = 0
+        # Allow an immediate trigger right after boot (not blocked by lockout).
+        self.last_trigger_ms = time.ticks_add(time.ticks_ms(), -lockout_ms)
+
+    def _read_delta(self):
+        self.tx.value(0)
+        time.sleep_us(self.settle_us)
+        dark = self.rx.read_u16()
+        self.tx.value(1)
+        time.sleep_us(self.settle_us)
+        lit = self.rx.read_u16()
+        self.tx.value(0)
+        return lit - dark
+
+    def calibrate(self):
+        total = 0
+        for _ in range(self.calibration_samples):
+            total += self._read_delta()
+        self.baseline = total // self.calibration_samples
+        self.hits = 0
+        return self.baseline
+
+    def poll(self, now_ms):
+        """Call at most every IR_SAMPLE_INTERVAL_MS; skip entirely while the
+        bell is ringing (a sample blocks for ~2*settle_us). Returns True
+        exactly once, the instant a trigger fires (after confirm+lockout)."""
+        if time.ticks_diff(now_ms, self.last_sample_ms) < IR_SAMPLE_INTERVAL_MS:
+            return False
+        self.last_sample_ms = now_ms
+        self.last_delta = self._read_delta()
+
+        if self.last_delta > self.baseline + self.margin:
+            if self.hits < self.confirm_samples:
+                self.hits += 1
+        else:
+            self.hits = 0
+
+        if self.hits >= self.confirm_samples and \
+                time.ticks_diff(now_ms, self.last_trigger_ms) >= self.lockout_ms:
+            self.last_trigger_ms = now_ms
+            self.hits = 0
+            return True
+        return False
+
+
+================================================================
+== FILE: hid_consumer.py
+================================================================
+
+"""
+USB HID device for absolute volume control, built on top of the official
+micropython-lib usb.device.hid.HIDInterface (vendored in /lib/usb/device/
+since this plain Pico has no Wi-Fi for `mip install`).
+
+Vendor-specific HID usage page 0xFF00, Usage 0x01: single-byte report is
+the literal target volume percentage (0-100). Because it's a vendor page
+(not Consumer Control), the OS does NOT treat it as a media key -- no mute
+side effects, no per-OS step-size guessing, no drift. A host-side companion
+script (see host/volume_daemon.py) reads this raw HID report via
+/dev/hidrawN and calls `pactl set-sink-volume` directly with the exact
+percentage.
+
+Rev N: ported back from legacy_itsybitsy unchanged -- this vendor report
+format was always Pico-native (the ItsyBitsy fork only added a Report ID
+byte because Arduino's HID.h/PluggableUSB requires one for custom
+descriptors; the Pico's usb.device.hid never needed it).
+"""
+
+from usb.device.hid import HIDInterface
+
+_REPORT_DESCRIPTOR = bytes([
+    0x06, 0x00, 0xFF,  # Usage Page (Vendor Defined 0xFF00)
+    0x09, 0x01,        # Usage (0x01)
+    0xA1, 0x01,        # Collection (Application)
+    0x15, 0x00,        #   Logical Minimum (0)
+    0x26, 0x64, 0x00,  #   Logical Maximum (100)
+    0x75, 0x08,        #   Report Size (8)
+    0x95, 0x01,        #   Report Count (1)
+    0x09, 0x01,        #   Usage (0x01)
+    0x81, 0x02,        #   Input (Data,Var,Abs)
+    0xC0,              # End Collection
+])
+
+
+class VolumeHID(HIDInterface):
+    def __init__(self):
+        super().__init__(
+            _REPORT_DESCRIPTOR,
+            interface_str="Vintage Rotary Volume Control",
+        )
+
+    def set_volume_percent(self, percent):
+        percent = max(0, min(100, int(percent)))
+        if not self.is_open():
+            return False
+        return self.send_report(bytes([percent]))
+
+
+================================================================
+== FILE: bell_ir_test.py
+================================================================
+
+"""
+Standalone bell + IR bring-up tool for the Raspberry Pi Pico (RP2040/
+MicroPython) -- Rev N. Mirrors legacy_itsybitsy/bell_ir_test/bell_ir_test.ino
+in spirit, adapted to this repo's established phased-bring-up pattern (see
+mic_meter.py/receiver_test.py in prior session history): a library of plain
+functions called interactively over mpremote's REPL, NOT a live serial
+character-command parser (mpremote doesn't give this script an easy way to
+read raw stdin chars while also printing).
+
+Does NOT import usb.device or hid_consumer, and does NOT load the dial/hook
+state machine -- flash/run this FIRST when bringing up new bell/IR hardware
+so a fault can only be in the new hardware, not main.py.
+
+Usage (from a host shell):
+    mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.ring()"
+    mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.dc_test('a')"
+    mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.ir_monitor(20)"
+or open an interactive REPL (`mpremote connect /dev/ttyACM0`) and call the
+functions directly -- Ctrl-C aborts ring()/hold()/ir_monitor() cleanly.
+
+WIRING: see bell.py and ir_trigger.py module docstrings, and
+docs/pico_port_handoff_prompt.md, for the full pin list and gate-drive
+theory (BELL_A/BELL_B are ACTIVE-LOW through an NPN level shifter).
+"""
+
+import time
+
+from bell import BellRinger
+from ir_trigger import IRTrigger
+
+BELL_A_PIN = 17
+BELL_B_PIN = 18
+IR_TX_PIN = 19
+IR_RX_PIN = 26
+
+bell = BellRinger(BELL_A_PIN, BELL_B_PIN, active_low=True)
+ir = IRTrigger(IR_TX_PIN, IR_RX_PIN)
+
+
+def ring():
+    """Standard cadence (2s ring / 4s pause, 2 bursts). Blocks until done; Ctrl-C aborts."""
+    bell.start(time.ticks_ms())
+    try:
+        while not bell.is_idle():
+            bell.update(time.ticks_ms())
+    except KeyboardInterrupt:
+        bell.stop()
+        print("aborted")
+        return
+    print("ring cadence done")
+
+
+def hold():
+    """Continuous ring for measuring/tuning. Ctrl-C to stop."""
+    bell.start(time.ticks_ms(), hold=True)
+    print("ringing continuously -- Ctrl-C to stop")
+    try:
+        while True:
+            bell.update(time.ticks_ms())
+    except KeyboardInterrupt:
+        bell.stop()
+        print("stopped")
+
+
+def dc_test(gate):
+    """Capped 10ms half-winding continuity check ('a' or 'b'). NOT a
+    substitute for the unpowered DMM R(3-6)~=2xR(3-4) check."""
+    bell.dc_test(gate, time.ticks_ms())
+    while not bell.is_idle():
+        bell.update(time.ticks_ms())
+    print("DC test done")
+
+
+def set_freq(hz):
+    actual = bell.set_ring_freq(hz)
+    print("ring frequency = {}Hz (half period {}ms)".format(actual, bell.half_period_ms))
+    return actual
+
+
+def ir_sample():
+    """One synchronous dark/lit/delta sample, printed and returned."""
+    ir.tx.value(0)
+    time.sleep_us(ir.settle_us)
+    dark = ir.rx.read_u16()
+    ir.tx.value(1)
+    time.sleep_us(ir.settle_us)
+    lit = ir.rx.read_u16()
+    ir.tx.value(0)
+    delta = lit - dark
+    print("dark={} lit={} delta={} (baseline {})".format(dark, lit, delta, ir.baseline))
+    return delta
+
+
+def ir_calibrate():
+    baseline = ir.calibrate()
+    print("IR baseline (direct emitter->detector crosstalk) = {} counts; trigger above {}".format(
+        baseline, baseline + ir.margin))
+    return baseline
+
+
+def ir_monitor(seconds=10):
+    """Print one IR sample per second for `seconds`. Ctrl-C stops early."""
+    end_ms = time.ticks_add(time.ticks_ms(), seconds * 1000)
+    try:
+        while time.ticks_diff(end_ms, time.ticks_ms()) > 0:
+            ir_sample()
+            time.sleep_ms(1000)
+    except KeyboardInterrupt:
+        print("stopped")
+
+
+if __name__ == "__main__":
+    print("Bell + IR bring-up tool ready. Call ring(), hold(), dc_test('a'/'b'),")
+    print("set_freq(hz), ir_sample(), ir_calibrate(), or ir_monitor(seconds).")
+    ir_calibrate()
