@@ -6,12 +6,20 @@ Pico (RP2040/MicroPython) -- Rev Q.
 Rev Q -- the IR proximity trigger (Rev J-P) is RETIRED and replaced with a
 direct-wired remote ring switch: a momentary mechanical switch (~5.5ohm
 closed-contact resistance) wired via 30-50cm of ordinary hookup wire
-directly to GP19 (reused from IR_TX, renamed TRIGGER_PIN) and GND. The
-phone will never be relocated, so a plain wire is simpler than an optical
-sensor that needed calibration/lockout tuning and was architecturally
-incapable of seeing an independent remote transmitter anyway. See the
-"Rev Q summary" box on docs/schematics/rotary_dial_circuit_revQ.svg and
+directly to GP20 (TRIGGER_PIN) and GND. The phone will never be relocated,
+so a plain wire is simpler than an optical sensor that needed calibration/
+lockout tuning and was architecturally incapable of seeing an independent
+remote transmitter anyway. See the "Rev Q summary" box on
+docs/schematics/rotary_dial_circuit_revQ.svg and
 /memories/repo/vintage_headset.md for the full rationale.
+
+MOVED GP19 -> GP20 (2026-08-08): GP19 was bench-tested clean (no port
+contention, board confirmed alive/booting) and showed ZERO response to the
+physical switch across multiple presses -- no edge, on GP19 or on any other
+free GPIO scanned simultaneously. GP19 itself is not proven bad (could be a
+broken wire/joint/breadboard row never reaching the pad), but rather than
+keep debugging blind, the switch is being moved to a fresh, previously-
+unused pin (GP20) to isolate the fault. GP19 is now free/unused again.
 
 WIRING (see docs/schematics/rotary_dial_circuit_revQ.svg):
   SHUNT_PIN (GP2)  -- White pair (dial off-normal). ~14.5kohm internal
@@ -34,16 +42,19 @@ WIRING (see docs/schematics/rotary_dial_circuit_revQ.svg):
                       3V3 GPIO does not reliably enhance the on-hand
                       IRFZ44N directly) -- this pin is driven ACTIVE-LOW.
   BELL_B    (GP18) -- push-pull gate B. Same active-low convention.
-  TRIGGER   (GP19) -- remote ring switch (Rev Q). Internal Pin.PULL_UP;
-                      switch closes GP19 to GND. A new C11 100nF filter
-                      cap to GND (mirrors C6 on GP4) hardens the long
-                      unshielded wire run against EMI. GP26/ADC0 (old
-                      IR_RX) is now completely free, unwired.
+  TRIGGER   (GP20) -- remote ring switch (Rev Q, moved from GP19 2026-08-08
+                      after GP19 showed zero response under clean bench
+                      test). Internal Pin.PULL_UP; switch closes GP20 to
+                      GND. A new C11 100nF filter cap to GND (mirrors C6 on
+                      GP4) hardens the long unshielded wire run against EMI.
+                      GP19 and GP26/ADC0 (old IR_RX) are now both free.
 
 BELL/TRIGGER: see bell.py's module docstring for the ring-generator theory
-of operation. The bell only rings while ON-HOOK (mirrors the ItsyBitsy
-firmware's refusal to ring into a lifted handset) and is silenced
-immediately if the handset is answered mid-ring. TRIGGER_PIN is
+of operation. The bell rings on any trigger closure regardless of hook
+state -- there is no on-hook requirement (this is a deliberate departure
+from historical rotary-phone behavior; the switch is meant to ring the
+bell on demand, not simulate an incoming call). It is still silenced
+immediately if the handset is lifted mid-ring (answered). TRIGGER_PIN is
 interrupt-driven, debounced, and edge-triggered on the closing edge only
 -- holding the switch closed does not re-trigger while already ringing or
 before release.
@@ -102,7 +113,7 @@ LED_HOOK_PIN = 16
 
 BELL_A_PIN = 17
 BELL_B_PIN = 18
-TRIGGER_PIN = 19   # Rev Q: remote ring switch (was IR_TX). GP26/ADC0 (old IR_RX) is now free.
+TRIGGER_PIN = 20   # Rev Q: remote ring switch. Moved from GP19 2026-08-08 (zero response on GP19).
 
 DEBOUNCE_MS = 15
 HOOK_DEBOUNCE_MS = 30
@@ -195,7 +206,7 @@ trigger.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_trigger_irq)
 
 print("Rotary dial decoder (Rev Q, Pico) + HID volume + bell + remote switch ready.")
 print("SHUNT=GP2 (White, ext. 2.2kohm pull-up)  PULSE=GP3 (Blue, int. pull-up)")
-print("HOOK=GP4 (Green/White, int. pull-up)  BELL=GP17/18 (active-low)  TRIGGER=GP19 (int. pull-up)")
+print("HOOK=GP4 (Green/White, int. pull-up)  BELL=GP17/18 (active-low)  TRIGGER=GP20 (int. pull-up)")
 print("Dial a digit and watch the log + LEDs. digit N -> N*10% volume (0 -> 100%)")
 print("Lift handset to unmute/restore volume, replace handset to mute.")
 print("-" * 60)
@@ -267,8 +278,6 @@ try:
             else:  # TRIGGER (Rev Q: remote ring switch, closing edge only)
                 if not bell.is_idle():
                     print("[{:>8d}ms] TRIGGER -> ignored, already ringing".format(ev_now))
-                elif not on_hook:
-                    print("[{:>8d}ms] TRIGGER -> ignored, handset off-hook".format(ev_now))
                 else:
                     print("[{:>8d}ms] TRIGGER -> ringing".format(ev_now))
                     if _wdt is None:

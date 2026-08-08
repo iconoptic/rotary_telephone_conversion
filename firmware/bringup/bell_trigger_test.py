@@ -2,8 +2,9 @@
 Standalone bell + remote-switch bring-up tool for the Raspberry Pi Pico
 (RP2040/MicroPython) -- Rev Q. Renamed from bell_ir_test.py: the IR
 proximity trigger (Rev J-P) is retired and replaced by a direct-wired
-remote ring switch on GP19 (see main.py's module docstring and
-docs/schematics/rotary_dial_circuit_revQ.svg for the full rationale).
+remote ring switch on GP20 (moved from GP19 2026-08-08 after GP19 showed
+zero response under a clean bench test -- see main.py's module docstring
+and docs/schematics/rotary_dial_circuit_revQ.svg for the full rationale).
 Adapted from this repo's established phased-bring-up pattern: a library
 of plain functions called interactively over mpremote's REPL, NOT a live
 serial character-command parser (mpremote doesn't give this script an
@@ -24,8 +25,8 @@ functions directly -- Ctrl-C aborts ring()/hold()/gate_hold() cleanly.
 WIRING: see bell.py's module docstring and
 docs/schematics/rotary_dial_circuit_revQ.svg for the full pin list and
 gate-drive theory (BELL_A/BELL_B are ACTIVE-LOW through an NPN level
-shifter). TRIGGER_PIN (GP19) is a plain Pin.PULL_UP input; the remote
-switch closes it to GND.
+shifter). TRIGGER_PIN (GP20) is a plain Pin.PULL_UP input; the remote
+switch closes it to GND. GP19 is free/unused (moved here 2026-08-08).
 """
 
 import time
@@ -36,7 +37,7 @@ from bell import BellRinger
 
 BELL_A_PIN = 17
 BELL_B_PIN = 18
-TRIGGER_PIN = 19   # Rev Q: remote ring switch (was IR_TX)
+TRIGGER_PIN = 20   # Rev Q: remote ring switch. Moved from GP19 2026-08-08 (zero response on GP19).
 
 # MUST match the physical centre-tap rail. Rev P: the 160G24's tap is back
 # on 5V VBUS (jumper 6-7) and the 12V wall wart is retired. Deploy this
@@ -194,11 +195,11 @@ def supply(volts):
 
 
 def trigger_status():
-    """Print and return the current raw GP19/TRIGGER_PIN state (Rev Q:
+    """Print and return the current raw GP20/TRIGGER_PIN state (Rev Q:
     remote ring switch). Pin.PULL_UP means value()==1 (HIGH) at rest,
     value()==0 (LOW) while the remote switch is held closed."""
     closed = trigger.value() == 0
-    print("TRIGGER GP19 = {} ({})".format(trigger.value(), "CLOSED" if closed else "open/at rest"))
+    print("TRIGGER GP20 = {} ({})".format(trigger.value(), "CLOSED" if closed else "open/at rest"))
     return closed
 
 

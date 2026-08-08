@@ -24,7 +24,7 @@
   <text x="20" y="50" class="lbl-sm">Pico duties: rotary dial (WHITE=shunt/N1, BLUE=pulse/N2) &#8594; volume digit; GREEN/WHITE switchhook lever (N3) &#8594; mute; and (since Rev J, switch-triggered since Rev Q) a ring generator for the original bell.</text>
   <text x="20" y="70" class="lbl-sm">Audio is still handled entirely by a gutted Logitech USB headset (M/N A-00008): its own USB audio PCB (DAC + Class-D amp + mic preamp/ADC) drives a Logitech speaker + electret mic mounted inside the handset.</text>
   <text x="20" y="90" class="lbl-sm">An internal 2-port USB hub combines the Pico (HID volume/mute) and the Logitech audio PCB (USB Audio) onto the single USB cable leaving the phone -- the PC sees two ordinary USB devices.</text>
-  <text x="20" y="110" class="lbl-sm" fill="#1e5c1e">Rev J rationale: the bell coils measure 5.97k&#8486; and expect ~90V/20Hz, so they get a push-pull step-up ring generator (all switching stays at 5V). Rev Q: a remote momentary switch closes GP19 to GND to ring it.</text>
+  <text x="20" y="110" class="lbl-sm" fill="#1e5c1e">Rev J rationale: the bell coils measure 5.97k&#8486; and expect ~90V/20Hz, so they get a push-pull step-up ring generator (all switching stays at 5V). Rev Q: a remote momentary switch closes GP20 to GND to ring it.</text>
 
   <!-- ======================= PICO BODY (dial + hook + LEDs + HID volume ONLY) ======================= -->
   <rect x="850" y="170" width="260" height="680" rx="6" class="ic"/>
@@ -54,11 +54,11 @@
   <circle cx="1110" cy="580" r="3" class="node"/>
   <text x="1100" y="566" text-anchor="end" class="lbl-sm">GP16 LED_HOOK</text>
 
-  <!-- Rev J: bell signals leave as named nets to the panel further down. Rev Q: GP19 repurposed IR_TX -> TRIGGER (remote switch), GP26/ADC0 freed entirely (no longer wired to anything). -->
+  <!-- Rev J: bell signals leave as named nets to the panel further down. Rev Q: GP19 repurposed IR_TX -> TRIGGER (remote switch), GP26/ADC0 freed entirely (no longer wired to anything). Moved to GP20 2026-08-08 (GP19 dead-tested). -->
   <circle cx="1110" cy="650" r="3" class="node"/>
   <line x1="1110" y1="650" x2="1180" y2="650" class="wire"/>
   <rect x="1180" y="638" width="130" height="24" rx="4" class="ic"/>
-  <text x="1245" y="655" text-anchor="middle" class="lbl-sm">TRIGGER  GP19</text>
+  <text x="1245" y="655" text-anchor="middle" class="lbl-sm">TRIGGER  GP20</text>
   <text x="1100" y="686" text-anchor="end" class="lbl-sm" fill="#888">GP26/ADC0 -- unused, spare (Rev Q: IR_RX removed)</text>
   <circle cx="1110" cy="730" r="3" class="node"/>
   <line x1="1110" y1="730" x2="1180" y2="730" class="wire"/>
@@ -331,7 +331,7 @@
   <text x="32" y="1440" class="lbl-sm" fill="#a03a3a">Direct-wired, no MCU sensing -- the phone will never be relocated.</text>
 
   <rect x="40" y="1458" width="130" height="24" rx="4" class="ic"/>
-  <text x="105" y="1475" text-anchor="middle" class="lbl-sm">TRIGGER  GP19</text>
+  <text x="105" y="1475" text-anchor="middle" class="lbl-sm">TRIGGER  GP20</text>
   <line x1="170" y1="1470" x2="210" y2="1470" class="wire"/>
   <circle cx="210" cy="1470" r="4" class="node"/>
 
@@ -361,9 +361,9 @@
   <line x1="416" y1="1698" x2="424" y2="1698" class="wire"/>
   <text x="444" y="1668" class="lbl-sm">GND</text>
 
-  <text x="32" y="1732" class="lbl-sm" fill="#555">GP19 keeps its internal Pin.PULL_UP -- SW1's ~5.5&#937; closed</text>
+  <text x="32" y="1732" class="lbl-sm" fill="#555">GP20 keeps its internal Pin.PULL_UP -- SW1's ~5.5&#937; closed</text>
   <text x="32" y="1748" class="lbl-sm" fill="#555">resistance is negligible against the ~50-80k&#937; pull-up.</text>
-  <text x="32" y="1766" class="lbl-sm" fill="#555">GP26/ADC0 (old IR_RX) is now free -- unwired, unused.</text>
+  <text x="32" y="1766" class="lbl-sm" fill="#555">GP19 and GP26/ADC0 (old IR_RX) are both free -- unwired.</text>
   <text x="32" y="1784" class="lbl-sm" fill="#555">Firmware: IRQ-driven, ~20ms debounce, closing edge only.</text>
 
   <!-- Bell driver sub-panel -->
@@ -540,7 +540,7 @@
   <rect x="20" y="1820" width="1550" height="250" fill="#fdf1e0" stroke="#b06a1f" stroke-width="1.5"/>
   <text x="32" y="1842" class="lbl-b" fill="#7a4712">Rev J &#8212; why these parts: the remote trigger and the bell drive</text>
   <text x="32" y="1866" class="lbl-sm" fill="#7a4712">Rev Q: a direct-wired momentary switch replaces the IR link -- the phone will never be relocated, so a plain 30-50cm wire is simpler than an optical sensor needing calibration and lockout tuning.</text>
-  <text x="32" y="1884" class="lbl-sm" fill="#7a4712">GP19 (reused from IR_TX) uses its internal Pin.PULL_UP; SW1's ~5.5&#937; closed-contact resistance is negligible against it. C11 100nF at the pin mirrors C6/GP4's EMI filtering for the long cord run.</text>
+  <text x="32" y="1884" class="lbl-sm" fill="#7a4712">GP20 (moved from GP19 2026-08-08 -- see the pin-move note below) uses its internal Pin.PULL_UP; SW1's ~5.5&#937; closed-contact resistance is negligible against it. C11 100nF mirrors C6/GP4's EMI filtering.</text>
   <text x="32" y="1902" class="lbl-sm" fill="#7a4712">This also frees GP26/ADC0 entirely (no wiring, no firmware use) and removes Q4, R11, LED4, R10 and the ir_trigger.py module -- see the Rev Q summary box near the end of this sheet.</text>
   <text x="32" y="1926" class="lbl-sm" fill="#7a4712">Bell: 5.97k&#8486; DC measured across RED/BLACK. At 5V that is 0.84mA. These coils expect ~90V/20Hz (~15mA), so switching harder at 5V can never work -- the missing ingredient is voltage, not current.</text>
   <text x="32" y="1944" class="lbl-sm" fill="#7a4712">Q2/Q3 alternately ground the two halves of T1's 12-0-12 LV winding (tap on 5V) and the mains winding drives the bell. T1's TWO 115V primaries in series (230V): 19:1 gives ~&#177;96V and ~15.5mA -- the original exchange spec.</text>
@@ -733,11 +733,13 @@
   <rect x="20" y="4308" width="1550" height="232" fill="#eef0fb" stroke="#3a4a9c" stroke-width="1.5"/>
   <text x="32" y="4330" class="lbl-b" fill="#1c2a70">Rev Q summary (2026-08-07) &#8212; IR trigger retired, replaced by a direct-wired remote ring switch</text>
   <text x="32" y="4350" class="lbl-sm" fill="#1c2a70">Rationale: the phone will never be relocated, so IR's ambient-light rejection, calibration and reflective-only architecture bought nothing a plain wire can't do simpler and more reliably.</text>
-  <text x="32" y="4368" class="lbl-sm" fill="#1c2a70">New hardware: a momentary mechanical switch (~5.5&#937; closed-contact resistance, negligible vs the pull-up) wired via 30-50cm of ordinary hookup wire directly to GP19 (reused, renamed TRIGGER_PIN) and GND.</text>
-  <text x="32" y="4386" class="lbl-sm" fill="#1c2a70">GP19 uses the internal Pin.PULL_UP (software) plus a NEW C11 100nF filter cap to GND, mounted close to the pin -- same EMI/RC hardening rationale as C6 on the switchhook cord (GP4), for an equally long unshielded run.</text>
+  <text x="32" y="4368" class="lbl-sm" fill="#1c2a70">New hardware: a momentary mechanical switch (~5.5&#937; closed-contact resistance, negligible vs the pull-up) wired via 30-50cm of ordinary hookup wire directly to GP20 (TRIGGER_PIN) and GND.</text>
+  <text x="32" y="4386" class="lbl-sm" fill="#1c2a70">GP20 uses the internal Pin.PULL_UP (software) plus a NEW C11 100nF filter cap to GND, mounted close to the pin -- same EMI/RC hardening rationale as C6 on the switchhook cord (GP4), for an equally long unshielded run.</text>
   <text x="32" y="4404" class="lbl-sm" fill="#1c2a70">REMOVED entirely: Q4 phototransistor, R11 10k, LED4 IR emitter, R10 150&#8486;, and the ir_trigger.py firmware module (calibration, lockout, synchronous sampling). GP26/ADC0 is now completely free for future use.</text>
   <text x="32" y="4422" class="lbl-sm" fill="#1c2a70">Debounce: TRIGGER_PIN is treated like the dial/hook contacts -- IRQ-driven, ~20ms debounce, edge-triggered on the closing edge only. Holding the switch does not re-trigger while already ringing or before release.</text>
-  <text x="32" y="4440" class="lbl-sm" fill="#1c2a70">Behavior is otherwise unchanged from the IR design: pressing SW1 rings the bell only while ON-HOOK (ignored off-hook), and lifting the handset mid-ring silences it instantly -- same watchdog arm-on-first-ring.</text>
+  <text x="32" y="4440" class="lbl-sm" fill="#1c2a70">Behavior: the bell has NO dependency on hook/dial state -- pressing SW1 always rings (whenever idle), regardless of on/off-hook. Lifting the handset mid-ring still silences it instantly (answering it).</text>
   <text x="32" y="4458" class="lbl-sm" fill="#a03a3a">Safety: this is a plain low-voltage logic signal (3V3, internal pull-up) -- the long wire only ever carries a GPIO/GND pair, never anything from the bell's ~&#177;96V secondary. No new shock hazard is introduced.</text>
   <text x="32" y="4476" class="lbl-sm" fill="#1c2a70">Historical: the removed IR circuit (Q4/R10/R11/LED4, ir_trigger.py) remains fully documented in Rev P and earlier schematics and in git history, should a future demodulating IR remote receiver be revisited.</text>
+  <text x="32" y="4494" class="lbl-sm" fill="#a03a3a">PIN MOVE (2026-08-08): GP19 showed ZERO response to the switch under a clean, uncontested bench test (board confirmed alive/booting, no other process on the serial port) -- moved TRIGGER_PIN to GP20, which</text>
+  <text x="32" y="4510" class="lbl-sm" fill="#a03a3a">worked immediately. GP19 is not proven bad silicon (suspected broken wire/joint/breadboard row) -- it is simply unused now. Current-revision diagram content above already reflects GP20.</text>
 </svg>
