@@ -2,11 +2,11 @@
 Comprehensive frequency x on-time (duty) parameter sweep for the Rev P
 bell stage (T1 = 160G24, Q2/Q3 = STP55NF06L, tap on VBUS).
 
-Standalone script built ON TOP of bell_ir_test.py's already-initialized
-BellRinger/IRTrigger (imported, not re-constructed) so there is exactly
-one Pin() owner for GP17/GP18 and one source of truth for SUPPLY_V. Does
-NOT import usb.device/hid_consumer/main -- safe to run without disturbing
-the dial/HID firmware.
+Standalone script built ON TOP of bell_trigger_test.py's already-initialized
+BellRinger (imported, not re-constructed) so there is exactly one Pin()
+owner for GP17/GP18 and one source of truth for SUPPLY_V. Does NOT import
+usb.device/hid_consumer/main -- safe to run without disturbing the
+dial/HID firmware.
 
 Two independent sweeps, run separately so a bad reading in one mode can't
 be misread as the other:
@@ -17,7 +17,7 @@ be misread as the other:
     full-square saturation floor).
   - all_sweeps(): runs both back to back.
 
-Every permutation reuses hold()/strike() from bell_ir_test.py, so each
+Every permutation reuses hold()/strike() from bell_trigger_test.py, so each
 dwell window already prints its own VSYS-sag telemetry (the no-scope
 brownout/inrush evidence) -- this script only adds the labeled grid walk
 and a restore-to-default-frequency step at the end (so a run cut short by
@@ -34,13 +34,13 @@ striking setting, not the disconnected-secondary bench checks):
     mpremote connect /dev/ttyACM0 exec "import bell_sweep_test as s; s.strike_sweep()"
     mpremote connect /dev/ttyACM0 exec "import bell_sweep_test as s; s.all_sweeps()"
 Ctrl-C aborts the current dwell and skips to cleanup (each stage prints
-a final restore-to-default line, matching bell_ir_test.py's own
+a final restore-to-default line, matching bell_trigger_test.py's own
 Ctrl-C-safe pattern).
 """
 
 import time
 
-import bell_ir_test as b
+import bell_trigger_test as b
 
 # Full-square frequencies to test: MIN_RING_FREQ_HZ(25)..MAX_RING_FREQ_HZ(40)
 # for the 160G24 at a <=5.5V tap (bell.py's set_ring_freq() clamps/raises

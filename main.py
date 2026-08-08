@@ -1,17 +1,19 @@
 """
 Rotary dial DECODER + switchhook + LED status + USB HID absolute volume
-control + bell ring generator + IR proximity trigger, for the Raspberry Pi
-Pico (RP2040/MicroPython) -- Rev N.
+control + bell ring generator + remote ring switch, for the Raspberry Pi
+Pico (RP2040/MicroPython) -- Rev Q.
 
-Rev N -- MCU migration BACK from the Adafruit ItsyBitsy 32u4 (Rev I-M),
-which failed (overheated, stopped enumerating over USB) during bell-driver
-bring-up. This restores the original dial/hook/HID subset (legacy_pico/)
-and ALSO ports the bell ring generator + IR trigger that were designed and
-firmware-complete on the ItsyBitsy but never had a Pico equivalent -- see
-docs/pico_port_handoff_prompt.md for the full port mandate and
-/memories/repo/vintage_headset.md for the design history.
+Rev Q -- the IR proximity trigger (Rev J-P) is RETIRED and replaced with a
+direct-wired remote ring switch: a momentary mechanical switch (~5.5ohm
+closed-contact resistance) wired via 30-50cm of ordinary hookup wire
+directly to GP19 (reused from IR_TX, renamed TRIGGER_PIN) and GND. The
+phone will never be relocated, so a plain wire is simpler than an optical
+sensor that needed calibration/lockout tuning and was architecturally
+incapable of seeing an independent remote transmitter anyway. See the
+"Rev Q summary" box on docs/schematics/rotary_dial_circuit_revQ.svg and
+/memories/repo/vintage_headset.md for the full rationale.
 
-WIRING (see docs/rotary_dial_circuit_revN.svg once drawn):
+WIRING (see docs/schematics/rotary_dial_circuit_revQ.svg):
   SHUNT_PIN (GP2)  -- White pair (dial off-normal). ~14.5kohm internal
                       bleeder resistor in parallel with the contact at
                       rest, so an EXTERNAL 2.2kohm pull-up to 3V3 (R3) is
@@ -32,16 +34,19 @@ WIRING (see docs/rotary_dial_circuit_revN.svg once drawn):
                       3V3 GPIO does not reliably enhance the on-hand
                       IRFZ44N directly) -- this pin is driven ACTIVE-LOW.
   BELL_B    (GP18) -- push-pull gate B. Same active-low convention.
-  IR_TX     (GP19) -- IR emitter LED (via R10). Digital out.
-  IR_RX     (GP26/ADC0) -- IR phototransistor emitter-follower (+ R11 to
-                      GND). Analog in.
+  TRIGGER   (GP19) -- remote ring switch (Rev Q). Internal Pin.PULL_UP;
+                      switch closes GP19 to GND. A new C11 100nF filter
+                      cap to GND (mirrors C6 on GP4) hardens the long
+                      unshielded wire run against EMI. GP26/ADC0 (old
+                      IR_RX) is now completely free, unwired.
 
-BELL/IR: see bell.py and ir_trigger.py module docstrings for the full
-theory of operation. The bell only rings while ON-HOOK (mirrors the
-ItsyBitsy firmware's refusal to ring into a lifted handset) and is
-silenced immediately if the handset is answered mid-ring. IR sampling is
-skipped entirely while the bell is ringing (a sample blocks for a couple
-hundred microseconds and would distort the ring waveform).
+BELL/TRIGGER: see bell.py's module docstring for the ring-generator theory
+of operation. The bell only rings while ON-HOOK (mirrors the ItsyBitsy
+firmware's refusal to ring into a lifted handset) and is silenced
+immediately if the handset is answered mid-ring. TRIGGER_PIN is
+interrupt-driven, debounced, and edge-triggered on the closing edge only
+-- holding the switch closed does not re-trigger while already ringing or
+before release.
 
 ARCHITECTURE CHANGE FROM THE ORIGINAL legacy_pico/main.py: the old main
 loop drained the dial/hook IRQ event queue then `time.sleep_ms(5)`. The
@@ -86,7 +91,6 @@ from machine import Pin
 import usb.device
 from hid_consumer import VolumeHID
 from bell import BellRinger
-from ir_trigger import IRTrigger
 
 SHUNT_PIN = 2
 PULSE_PIN = 3
@@ -98,11 +102,11 @@ LED_HOOK_PIN = 16
 
 BELL_A_PIN = 17
 BELL_B_PIN = 18
-IR_TX_PIN = 19
-IR_RX_PIN = 26
+TRIGGER_PIN = 19   # Rev Q: remote ring switch (was IR_TX). GP26/ADC0 (old IR_RX) is now free.
 
 DEBOUNCE_MS = 15
 HOOK_DEBOUNCE_MS = 30
+TRIGGER_DEBOUNCE_MS = 20
 
 WDT_TIMEOUT_MS = 5000   # lazily armed on first bell.start() -- see module docstring
 GC_INTERVAL_MS = 5000   # only run while bell.is_idle() -- see module docstring
@@ -110,13 +114,13 @@ GC_INTERVAL_MS = 5000   # only run while bell.is_idle() -- see module docstring
 shunt = Pin(SHUNT_PIN, Pin.IN)              # no internal pull -- R3 does the job
 pulse = Pin(PULSE_PIN, Pin.IN, Pin.PULL_UP)
 hook = Pin(HOOK_PIN, Pin.IN, Pin.PULL_UP)
+trigger = Pin(TRIGGER_PIN, Pin.IN, Pin.PULL_UP)   # Rev Q: remote ring switch
 
 led_shunt = Pin(LED_SHUNT_PIN, Pin.OUT)
 led_pulse = Pin(LED_PULSE_PIN, Pin.OUT)
 led_hook = Pin(LED_HOOK_PIN, Pin.OUT)
 
 bell = BellRinger(BELL_A_PIN, BELL_B_PIN, active_low=True)
-ir = IRTrigger(IR_TX_PIN, IR_RX_PIN)
 
 # Re-enumerates the USB device (builtin_driver=True keeps the CDC/REPL
 # connection alive as a composite device) -- any existing mpremote/serial
@@ -134,7 +138,7 @@ _EVQ_LEN = 128
 _evq = [(0, '', 0)] * _EVQ_LEN
 _evq_head = 0
 _evq_tail = 0
-_last_irq_ms = {'SHUNT': 0, 'PULSE': 0, 'HOOK': 0}
+_last_irq_ms = {'SHUNT': 0, 'PULSE': 0, 'HOOK': 0, 'TRIGGER': 0}
 
 
 def _push(now, ch, val):
@@ -172,13 +176,26 @@ def _hook_irq(pin):
     _push(now, 'HOOK', 1 if closed else 0)
 
 
+def _trigger_irq(pin):
+    # Rev Q: remote ring switch. Edge-triggered on the CLOSING edge only --
+    # the release edge is ignored entirely, so holding the switch shut
+    # cannot re-trigger a ring.
+    now = time.ticks_ms()
+    if time.ticks_diff(now, _last_irq_ms['TRIGGER']) < TRIGGER_DEBOUNCE_MS:
+        return
+    _last_irq_ms['TRIGGER'] = now
+    if pin.value() == 0:
+        _push(now, 'TRIGGER', 1)
+
+
 shunt.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_shunt_irq)
 pulse.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_pulse_irq)
 hook.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_hook_irq)
+trigger.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=_trigger_irq)
 
-print("Rotary dial decoder (Rev N, Pico) + HID volume + bell + IR trigger ready.")
+print("Rotary dial decoder (Rev Q, Pico) + HID volume + bell + remote switch ready.")
 print("SHUNT=GP2 (White, ext. 2.2kohm pull-up)  PULSE=GP3 (Blue, int. pull-up)")
-print("HOOK=GP4 (Green/White, int. pull-up)  BELL=GP17/18 (active-low)  IR TX=GP19 RX=GP26")
+print("HOOK=GP4 (Green/White, int. pull-up)  BELL=GP17/18 (active-low)  TRIGGER=GP19 (int. pull-up)")
 print("Dial a digit and watch the log + LEDs. digit N -> N*10% volume (0 -> 100%)")
 print("Lift handset to unmute/restore volume, replace handset to mute.")
 print("-" * 60)
@@ -194,10 +211,6 @@ if on_hook:
 else:
     print("Startup state: OFF-HOOK, volume {}%".format(last_volume_percent))
     hid.set_volume_percent(last_volume_percent)
-
-irb = ir.calibrate()
-print("IR baseline (emitter/detector crosstalk) = {} counts; trigger above {}".format(
-    irb, irb + ir.margin))
 
 _wdt = None
 _last_gc_ms = time.ticks_ms()
@@ -237,7 +250,7 @@ try:
                     ev_now, "MAKE (closed)" if closed else "BREAK (open)"))
                 if dial_active and closed:
                     make_count += 1
-            else:  # HOOK
+            elif ch == 'HOOK':
                 closed = bool(val)
                 on_hook = closed
                 led_hook.value(1 if on_hook else 0)
@@ -251,18 +264,17 @@ try:
                     if not bell.is_idle():
                         print("    -> handset answered, bell silenced")
                         bell.stop()
-
-        # IR proximity trigger -- only while the bell isn't already ringing (a
-        # sample blocks briefly and would distort the ring waveform anyway).
-        if bell.is_idle() and ir.poll(now):
-            if on_hook:
-                print("[{:>8d}ms] IR TRIGGER -> ringing".format(now))
-                if _wdt is None:
-                    _wdt = machine.WDT(timeout=WDT_TIMEOUT_MS)
-                    print("    -> watchdog armed ({}ms, cannot be disarmed)".format(WDT_TIMEOUT_MS))
-                bell.start(now)
-            else:
-                print("[{:>8d}ms] IR TRIGGER -> ignored, handset off-hook".format(now))
+            else:  # TRIGGER (Rev Q: remote ring switch, closing edge only)
+                if not bell.is_idle():
+                    print("[{:>8d}ms] TRIGGER -> ignored, already ringing".format(ev_now))
+                elif not on_hook:
+                    print("[{:>8d}ms] TRIGGER -> ignored, handset off-hook".format(ev_now))
+                else:
+                    print("[{:>8d}ms] TRIGGER -> ringing".format(ev_now))
+                    if _wdt is None:
+                        _wdt = machine.WDT(timeout=WDT_TIMEOUT_MS)
+                        print("    -> watchdog armed ({}ms, cannot be disarmed)".format(WDT_TIMEOUT_MS))
+                    bell.start(ev_now)
 
         if _wdt is not None:
             _wdt.feed()
