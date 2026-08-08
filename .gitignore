@@ -1,5 +1,3 @@
 __pycache__/
 *.pyc
-
-# Gemini deep-research package (local only)
-gemini_revN_review/
+*.svg.txt
