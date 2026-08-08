@@ -15,6 +15,7 @@ Usage (from a host shell):
     mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.ring()"
     mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.dc_test('a')"
     mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.ir_monitor(20)"
+    mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.ir_raw()"
     mpremote connect /dev/ttyACM0 exec "import bell_ir_test as b; b.gate_hold('a', 1)"
 or open an interactive REPL (`mpremote connect /dev/ttyACM0`) and call the
 functions directly -- Ctrl-C aborts ring()/hold()/ir_monitor()/gate_hold()
@@ -263,6 +264,31 @@ def ir_sample():
     return delta
 
 
+def ir_raw():
+    """Print the raw dark1/lit/dark2 node voltages (not just the delta) --
+    this is the device-class discriminator from the 2026-08-07 IR sheet
+    audit (see ir_trigger.py's module docstring). A volts-scale swing means
+    Q4 is a phototransistor (this design's assumption, clears
+    IR_TRIGGER_MARGIN easily); a millivolts-scale swing behaves like a
+    photodiode into R11 and would never clear the margin. Settles the
+    question from a serial log alone, no DMM required."""
+    ir.tx.value(0)
+    time.sleep_us(ir.settle_us)
+    dark1 = ir.rx.read_u16()
+    ir.tx.value(1)
+    time.sleep_us(ir.settle_us)
+    lit = ir.rx.read_u16()
+    ir.tx.value(0)
+    time.sleep_us(ir.settle_us)
+    dark2 = ir.rx.read_u16()
+    k = 3.3 / 65535
+    swing_v = (lit - (dark1 + dark2) / 2) * k
+    print("dark1={:.3f}V lit={:.3f}V dark2={:.3f}V swing={:.3f}V ({})".format(
+        dark1 * k, lit * k, dark2 * k, swing_v,
+        "phototransistor-scale" if abs(swing_v) > 0.1 else "photodiode-scale, TOO SMALL"))
+    return swing_v
+
+
 def ir_calibrate():
     baseline = ir.calibrate()
     print("IR baseline (direct emitter->detector crosstalk) = {} counts; trigger above {}".format(
@@ -284,5 +310,5 @@ def ir_monitor(seconds=10):
 if __name__ == "__main__":
     print("Bell + IR bring-up tool ready. Call bringup() for the guided progressive")
     print("test sequence, or individually: ring(), hold(), dc_test('a'/'b'),")
-    print("gate_hold('a'/'b', 0/1, seconds), set_freq(hz), ir_sample(), ir_calibrate(), or ir_monitor(seconds).")
+    print("gate_hold('a'/'b', 0/1, seconds), set_freq(hz), ir_sample(), ir_raw(), ir_calibrate(), or ir_monitor(seconds).")
     ir_calibrate()

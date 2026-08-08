@@ -33,6 +33,26 @@ docs/revN_design_review/01_gemini_deep_research_audit.md, findings C12/C13):
   Pin(..., drive=...) (verified against the machine.Pin docs -- that kwarg
   is cc3200/psoc-edge only), so the fix pokes the PADS_BANK0 register
   directly via machine.mem32 to raise TX_PIN to the 12mA setting.
+
+IR SHEET AUDIT (2026-08-07, Gikfun EK8443 one-page wiring sheet): confirms
+940nm Vf 1.2-1.5V and the receiver's rail/10k-to-ADC-node topology, but
+gives no receiver device-class or current rating -- two open items are
+load-bearing and unresolved by paper alone:
+- DEVICE CLASS: IR_TRIGGER_MARGIN (2600 counts, ~131mV) assumes a
+  phototransistor (volts-scale swing into R11). A photodiode would swing
+  only millivolts into 10k and could never clear this margin. Verify with
+  bell_ir_test.ir_raw() -- prints raw dark/lit volts, not just the delta --
+  before trusting any threshold tuning.
+- ORIENTATION: the sheet marks the receiver's leads +/- (sense-node side /
+  rail side) -- match that against the physical part's long/short lead (or
+  flat spot) before install. Reversed wiring fails SILENTLY (near-zero
+  signal, current already capped by R11), not destructively.
+This reconfirms (does not change) the conclusion already on the schematic:
+a synchronous dark/lit/dark sampler can only ever see its OWN emitter's
+reflection -- never an independent remote transmitter, regardless of
+tuning. Recomputed TX current from the sheet's Vf range: 12.0-14.0mA ideal
+at 3.3V/150ohm, ~10-13mA realistic once 12mA pad-drive VOH droop is
+counted (DRIVE=12mA sets output strength, it is not a current regulator).
 """
 
 import time
